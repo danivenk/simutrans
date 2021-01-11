@@ -1711,6 +1711,7 @@ const char *tool_buy_house_t::work( player_t *player, koord3d pos)
 
 	// since buildings can have more than one tile, we must handle them together
 	gebaeude_t* gb = gr->find<gebaeude_t>();
+	gb = gb->get_first_tile();
 	if(  gb== NULL  ||  !gb->is_city_building()  ||  !player_t::check_owner(gb->get_owner(),player)  ) {
 		return "Das Feld gehoert\neinem anderen Spieler\n";
 	}
@@ -2150,6 +2151,62 @@ const char *tool_plant_tree_t::work( player_t *player, koord3d pos )
 			desc = baum_t::find_tree(default_param+3);
 		}
 		if(desc  &&  baum_t::plant_tree_on_coordinate( k, desc, check_climates, random_age )  ) {
+			player_t::book_construction_costs(player, cost, k, ignore_wt);
+			return NULL;
+		}
+		return "";
+	}
+	return NULL;
+}
+
+char const* tool_plant_groundobj_t::move(player_t* const player, uint16 const b, koord3d const pos)
+{
+	if (b==0) {
+		return NULL;
+	}
+	if (env_t::networkmode) {
+		// queue tool for network
+		nwc_tool_t *nwc = new nwc_tool_t(player, this, pos, welt->get_steps(), welt->get_map_counter(), false);
+		network_send_server(nwc);
+		return NULL;
+	}
+	else {
+		return work( player, pos );
+	}
+}
+
+
+const char *tool_plant_groundobj_t::work( player_t *player, koord3d pos )
+{
+	koord k(pos.get_2d());
+
+	grund_t *gr = welt->lookup_kartenboden(k);
+	if(gr) {
+
+		const groundobj_desc_t *desc = NULL;
+		bool check_climates = true;
+		if(default_param==NULL  ||  strlen(default_param)==0) {
+			desc = groundobj_t::random_groundobj_for_climate( welt->get_climate( k ) );
+			if (desc == NULL) {
+				return NULL;
+			}
+		}
+		else {
+			check_climates = default_param[0]=='0';
+			desc = groundobj_t::find_groundobj(default_param+3);
+		}
+
+		// disable placing groundobj on slopes unless they have extra phases (=moving or for slopes)
+		if( !(gr->get_grund_hang() == sint8(0))  &&  desc->get_phases() == 2 ) {
+			return NULL;
+		}
+
+		// check funds
+		sint64 const cost = -desc->get_price();
+		if(  !player->can_afford(cost)  ) {
+			return NOTICE_INSUFFICIENT_FUNDS;
+		}
+		if(desc  &&  groundobj_t::plant_groundobj_on_coordinate( k, desc, check_climates ) ) {
 			player_t::book_construction_costs(player, cost, k, ignore_wt);
 			return NULL;
 		}
@@ -2905,18 +2962,20 @@ const char *tool_build_tunnel_t::do_work( player_t *player, const koord3d &start
 				// first check for building portal only
 				if(  is_ctrl_pressed()  ) {
 					// estimate costs for tunnel portal
-					win_set_static_tooltip( tooltip_with_price_length("Building costs estimates", (-(sint64)desc->get_price())*2, 1 ) );
-					return NULL;
+					if(  !player->can_afford((-(sint64)desc->get_price())*2)  ) {
+						return NOTICE_INSUFFICIENT_FUNDS;
+					}
 				}
-
-				// Now check, if we can built a tunnel here and display costs
-				koord3d end = tunnel_builder_t::find_end_pos(player, start, koord(gr->get_grund_hang()), desc, true, &err );
-				if(  end == koord3d::invalid  ||  end == start  ) {
-					// no end found
-					return err;
-				}
-				if(  !player->can_afford((-(sint64)desc->get_price())*koord_distance(start,end))  ) {
-					return NOTICE_INSUFFICIENT_FUNDS;
+				else {
+					// Now check, if we can built a tunnel here and display costs
+					koord3d end = tunnel_builder_t::find_end_pos(player, start, koord(gr->get_grund_hang()), desc, true, &err );
+					if(  end == koord3d::invalid  ||  end == start  ) {
+						// no end found
+						return err;
+					}
+					if(  !player->can_afford((-(sint64)desc->get_price())*koord_distance(start,end))  ) {
+						return NOTICE_INSUFFICIENT_FUNDS;
+					}
 				}
 
 				return tunnel_builder_t::build( player, start.get_2d(), desc, !is_ctrl_pressed() );
@@ -4759,7 +4818,7 @@ const char *tool_rotate_building_t::work( player_t *player, koord3d pos )
 			for(k.x=0; k.x<desc->get_x(layout); k.x++) {
 				for(k.y=0; k.y<desc->get_y(layout); k.y++) {
 					grund_t *gr = welt->lookup( gb->get_pos()+k );
-					if(  !gr  ) {
+					if(  !gr  ||  gr->hat_wege()  ) {
 						return "Cannot rotate this building!";
 					}
 					const building_tile_desc_t *tile = desc->get_tile(newlayout, k.x, k.y);
@@ -4771,6 +4830,9 @@ const char *tool_rotate_building_t::work( player_t *player, koord3d pos )
 						return "Cannot rotate this building!";
 					}
 				}
+			}
+			if( fabrik_t *fab=gb->get_fabrik() ) {
+				fab->set_rotate( (fab->get_rotate() + 3) % fab->get_desc()->get_building()->get_all_layouts() );
 			}
 			// ok, we can rotate it
 			for(k.x=0; k.x<desc->get_x(layout); k.x++) {
