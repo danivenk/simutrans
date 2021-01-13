@@ -4104,7 +4104,7 @@ const char *tool_build_station_t::tool_station_flat_dock_aux(player_t *player, k
 			}
 
 			if (gr->get_hoehe() != pos.z) {
-				return NOTICE_UNSUITABLE_GROUND;
+				last_error = NOTICE_UNSUITABLE_GROUND;
 				break;
 			}
 
@@ -4160,8 +4160,8 @@ const char *tool_build_station_t::tool_station_flat_dock_aux(player_t *player, k
 			halt = test_halt[i];
 			koord last_k = k + dx*len;
 			// layout: north 2, west 3, south 0, east 1
-			static const uint8 nsew_to_layout[4] = { 2, 0, 1, 3 };
-			layout = nsew_to_layout[i];
+			static const uint8 nesw_to_layout[4] = { 2, 1, 0, 3 };
+			layout = nesw_to_layout[i];
 			if(  layout>=2  ) {
 				// reverse construction in these directions
 				bau_pos = welt->lookup_kartenboden(last_k)->get_pos();
@@ -4832,7 +4832,7 @@ const char *tool_rotate_building_t::work( player_t *player, koord3d pos )
 				}
 			}
 			if( fabrik_t *fab=gb->get_fabrik() ) {
-				fab->set_rotate( (fab->get_rotate() + 3) % fab->get_desc()->get_building()->get_all_layouts() );
+				fab->set_rotate( (fab->get_rotate() + 1) % fab->get_desc()->get_building()->get_all_layouts() );
 			}
 			// ok, we can rotate it
 			for(k.x=0; k.x<desc->get_x(layout); k.x++) {
@@ -7786,16 +7786,17 @@ bool tool_rename_t::init(player_t *player)
 /*
  * Add a message to the message queue
  */
-bool tool_add_message_t::init(player_t *player)
+const char* tool_add_message_t::work(player_t* player, koord3d pos )
 {
-	if (  *default_param  ) {
+	if (default_param  &&  *default_param  ) {
 		uint32 type = atoi(default_param);
 		const char* text = strchr(default_param, ',');
-		if ((type & ~message_t::playermsg_flag) >= message_t::MAX_MESSAGE_TYPE  ||  text == NULL) {
-			return false;
+		if ((type & message_t::MESSAGE_TYPE_MASK) >= message_t::MAX_MESSAGE_TYPE  ||  text == NULL) {
+			return "";
 		}
-		welt->get_message()->add_message( text+1, koord::invalid, type,
-							    type & message_t::playermsg_flag ? color_idx_to_rgb(COL_BLACK) : PLAYER_FLAG|player->get_player_nr(), IMG_EMPTY );
+		welt->get_message()->add_message( text+1, pos.get_2d(), type,
+								player == NULL || ( (type & message_t::playermsg_flag) != 0)  ? color_idx_to_rgb(COL_BLACK) : PLAYER_FLAG|player->get_player_nr(), IMG_EMPTY );
+
 	}
-	return false;
+	return NULL;
 }
