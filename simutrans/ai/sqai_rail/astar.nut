@@ -224,7 +224,7 @@ class astar_route_finder extends astar
 	{
 		base.constructor()
 		wt = wt_
-		if ( [wt_all, wt_invalid, wt_water].find(wt) ) {
+		if ( [wt_all, wt_invalid, wt_water, wt_air].find(wt) ) {
 			throw("Using this waytype is going to be inefficient. Use at own risk.")
 		}
 	}
@@ -442,6 +442,12 @@ class astar_builder extends astar
 
 	function search_route(start, end, build_route = 1)
 	{
+
+		if ( start.len() == 0 || end.len() == 0 ) {
+			gui.add_message_at(our_player, " *** invalid tile : start or end ", world.get_time())
+			return { err =  "No route" }
+		}
+
 		prepare_search()
 		foreach (e in end) {
 			targets.append(e);
@@ -515,11 +521,34 @@ class astar_builder extends astar
 				}
 				else if (route[i-1].flag == 1) {
 					// plan build bridge
+
+					//
+						if ( route[i-1].x == route[i].x ) {
+							if ( route[i-1].y > route[i].y ) {
+								bridge_tiles += (route[i-1].y - route[i].y + 1)
+							} else {
+								bridge_tiles += (route[i].y - route[i-1].y + 1)
+							}
+						} else if ( route[i-1].y == route[i].y ) {
+							if ( route[i-1].x > route[i].x ) {
+								bridge_tiles += (route[i-1].x - route[i].x + 1)
+							} else {
+								bridge_tiles += (route[i].x - route[i-1].x + 1)
+							}
+						}
+
+
 					if ( build_route == 1 ) {
 						// check ground under bridge
 						// check_ground() return true build bridge
 						// check_ground() return false no build bridge
-						local build_bridge = check_ground(tile_x(route[i-1].x, route[i-1].y, route[i-1].z), tile_x(route[i].x, route[i].y, route[i].z), way)
+
+						local build_bridge = true
+						// check whether the ground can be adjusted and no bridge is necessary
+						// bridge len <= 4 tiles
+						if ( bridge_tiles < 5 ) {
+							build_bridge = check_ground(tile_x(route[i-1].x, route[i-1].y, route[i-1].z), tile_x(route[i].x, route[i].y, route[i].z), way)
+						}
 
 						if ( build_bridge ) {
 							err = command_x.build_bridge(our_player, route[i-1], route[i], bridger.bridge)
@@ -530,19 +559,6 @@ class astar_builder extends astar
 						}
 
 					} else if ( build_route == 0 ) {
-						if ( route[i-1].x == route[i].x ) {
-							if ( route[i-1].y > route[i].y ) {
-								bridge_tiles += (route[i-1].y - route[i].y + 1)
-							} else {
-								bridge_tiles += (route[i].y - route[i-1].y + 1)
-							}
-						} else if ( route[i-1].y == route[i].y ) {
-              if ( route[i-1].x > route[i].x ) {
-                bridge_tiles += (route[i-1].x - route[i].x + 1)
-              } else {
-                bridge_tiles += (route[i].x - route[i-1].x + 1)
-              }
-						}
 					}
 				}
 				if (err) {
@@ -610,10 +626,11 @@ function check_ground(pos_s, pos_e, way) {
 			// find z coord
 			z = square_x(t_tile[i].x, t_tile[i].y).get_ground_tile()
 			if ( !z.is_empty() || !z.is_ground() ) {
-				//gui.add_message_at(our_player, "check_ground - !z.is_empty() || !z.is_ground() " + coord_to_string(z), z)
+				gui.add_message_at(our_player, "check_ground - !z.is_empty() || !z.is_ground() " + coord_to_string(z), z)
 				return true
 			} else if ( (pos_s.z-2) <= z.z && z.get_slope() > 0 ) {
 				terraform_tiles.append(z)
+				gui.add_message_at(our_player, "check_ground - terraform_tiles.append(z) " + coord_to_string(z), z)
 			}
 		}
 
@@ -883,7 +900,7 @@ function remove_tile_to_empty(tiles, wt, t_array = 1) {
  * in case of success, the value of starts_field maybe changed
  *
  */
-function check_station(pl, starts_field, st_lenght, wt, select_station, build = 1){
+function check_station(pl, starts_field, st_lenght, wt, select_station, build = 1) {
 
 		// print messages box
 		// 1
@@ -1298,7 +1315,7 @@ function build_station(tiles, station_obj) {
 }
 
 /**
-  * find signal tool
+	* find signal tool
 	*
 	* sig_type	= signal type (is_signal, is_presignal ... )
 	* wt				= waytype
@@ -1333,6 +1350,9 @@ function find_object(obj, wt, speed) {
 		case "tunnel":
 			list = tunnel_desc_x.get_available_tunnels(wt)
 			break
+		case "way":
+			list = way_desc_x.get_available_ways(wt, st_flat)
+			break
 	}
 
 	local len = list.len()
@@ -1344,25 +1364,28 @@ function find_object(obj, wt, speed) {
 	if (len>0) {
 		obj_desc = list[0]
 
-		for(local i=1; i<len; i++) {
-			local b = list[i]
-			local o = 1
-			if ( obj == "bridge" && b.get_max_length() < min_len ) {
-				o = 0
-			}
-			if ( o == 1 ) {
-				if (obj_desc.get_topspeed() < speed) {
-					if (b.get_topspeed() > obj_desc.get_topspeed()) {
-						obj_desc = b
+			for(local i=1; i<len; i++) {
+				local b = list[i]
+				local o = 1
+				if ( obj == "bridge" && b.get_max_length() < min_len ) {
+					o = 0
+				}
+
+				if ( obj == "way" && !obj_desc.is_available(world.get_time()) ) {
+					o = 0
+				}
+
+				if ( o == 1 ) {
+					if (obj_desc.get_topspeed() <= speed) {
+						if (b.get_topspeed() > obj_desc.get_topspeed() && b.get_topspeed() <= speed ) {
+							obj_desc = b
+						} else {
+							obj_desc = b
+							break
+						}
 					}
 				}
-				else {
-					if (speed < b.get_topspeed() && max_speed > b.get_topspeed() && b.get_topspeed() > obj_desc.get_topspeed()) {
-						obj_desc = b
-					}
-				}
 			}
-		}
 	}
 
 	return obj_desc
@@ -2982,6 +3005,10 @@ function optimize_way_line(route, wt) {
 					//gui.add_message_at(our_player, " terraform tile_2: " + err, world.get_time())
 					//::debug.pause()
 				local way_obj = tile_4.find_object(mo_way).get_desc()
+				local txt_way = way_obj.is_available(world.get_time())
+				if ( !way_obj.is_available(world.get_time()) ) {
+					way_obj = find_object("way", wt, speed)
+				}
 				err = command_x.build_way(our_player, tile_4, tile_3, way_obj, true)
 				if (err != null ) {
 					gui.add_message_at(our_player, " build tunnel: " + err, world.get_time())
@@ -3095,17 +3122,24 @@ function destroy_line(line_obj) {
 		}
 		if ( wt != wt_water && combined_s > 1 && start_line_count > 1 ) {
 			gui.add_message_at(our_player, "return start combined station, more lines ", world.get_time())
-			return
+			return false
 		}
 		cnv.destroy(our_player)
 	}
 	// sleep - convoys are destroyed when simulation continues
 	sleep()
 
-	//::debug.pause()
-	// destroy line
-	line_obj.destroy(our_player)
-	//industry_manager.access_link(fsrc, fdest, freight).remove_line(c_line)
+	// check convoy count
+	cnv_list = line_obj.get_convoy_list()
+	if ( cnv_list.get_count() == 0 ) {
+		//::debug.pause()
+		// destroy line
+		line_obj.destroy(our_player)
+		//industry_manager.access_link(fsrc, fdest, freight).remove_line(c_line)
+	} else {
+		gui.add_message_at(our_player, " --> ERROR not all convoys delete from line ", world.get_time())
+	}
+
 	sleep()
 
 	start_line_count = start_h.get_line_list().get_count()
@@ -3138,29 +3172,34 @@ function destroy_line(line_obj) {
 	local treeway_tile_s = null
 	local treeway_tile_e = null
 
-	if ( wt != wt_water ) {
+	if ( wt != wt_water && wt != wt_air ) {
 		//gui.add_message_at(our_player, " search way line ", world.get_time())
 		local asf = astar_route_finder(wt)
 		wayline = asf.search_route([start_l], [end_l])
 
 		local i = 0
 
-		foreach(node in wayline.routes) {
-			local tile = tile_x(node.x, node.y, node.z)
-			//nexttile.append(tile)
-			// check route to treeways
-			// one treeway ( depot ) then no split line way
-			if ( dir.is_threeway(tile.get_way_dirs(wt)) ) {
-				treeways++
-				if ( i == 0 ) {
-					treeway_tile_e = tile
-					treeway_tile_s = tile
-					i++
-				} else {
-					treeway_tile_s = tile
+		if ("err" in wayline) {
+			gui.add_message_at(our_player, "ERROR search way line for remove", world.get_time())
+		} else {
+			foreach(node in wayline.routes) {
+				local tile = tile_x(node.x, node.y, node.z)
+				//nexttile.append(tile)
+				// check route to treeways
+				// one treeway ( depot ) then no split line way
+				if ( dir.is_threeway(tile.get_way_dirs(wt)) ) {
+					treeways++
+					if ( i == 0 ) {
+						treeway_tile_e = tile
+						treeway_tile_s = tile
+						i++
+					} else {
+						treeway_tile_s = tile
+					}
 				}
 			}
 		}
+
 	}
 
 	// world.get_convoy_list()
@@ -3264,7 +3303,7 @@ function destroy_line(line_obj) {
 		}
 	}
 
-	// remove road line
+	// remove water line
 	if ( wt == wt_water ) {
 		local tool = command_x(tool_remover)
 

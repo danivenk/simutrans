@@ -23,6 +23,8 @@
 #include "../unicode.h"
 #include "../simticker.h"
 #include "../utils/simstring.h"
+#include "../io/raw_image.h"
+
 #include "simgraph.h"
 
 
@@ -5090,13 +5092,11 @@ void simgraph_init(scr_size window_size, bool full_screen)
 		// init, load, and check fonts
 		if(  !display_load_font(env_t::fontname.c_str())  &&  !display_load_font(FONT_PATH_X "prop.fnt") ) {
 			dr_fatal_notify( "No fonts found!" );
-			fprintf(stderr, "Error: No fonts found!");
 			exit(-1);
 		}
 	}
 	else {
-		dr_fatal_notify( "Error: can't open window!" );
-		fprintf(stderr, "Error: can't open window!");
+		dr_fatal_notify( "Cannot open window!" );
 		exit(-1);
 	}
 
@@ -5247,21 +5247,44 @@ void simgraph_resize(scr_size new_window_size)
 /**
  * Take Screenshot
  */
-void display_snapshot( int x, int y, int w, int h )
+bool display_snapshot( const scr_rect &area )
 {
-	static int number = 0;
+	if (access(SCREENSHOT_PATH_X, W_OK) == -1) {
+		return false; // directory not accessible
+	}
 
-	char buf[80];
+	static int number = 0;
+	char filename[80];
 
 	// find the first not used screenshot image
 	do {
-		sprintf(buf, SCREENSHOT_PATH_X "simscr%02d.png", number);
-		if(access(buf, W_OK) == -1) {
-			sprintf(buf, SCREENSHOT_PATH_X "simscr%02d.bmp", number);
-		}
-		number ++;
-	} while (access(buf, W_OK) != -1);
-	sprintf(buf, SCREENSHOT_PATH_X "simscr%02d.bmp", number-1);
+		sprintf(filename, SCREENSHOT_PATH_X "simscr%02d.png", number++);
+	} while (access(filename, W_OK) != -1);
 
-	dr_screenshot(buf, x, y, w, h);
+	// now save the screenshot
+	scr_rect clipped_area = area;
+	clipped_area.clip(scr_rect(0, 0, disp_actual_width, disp_height));
+
+	raw_image_t img(clipped_area.w, clipped_area.h, raw_image_t::FMT_RGB888);
+
+	for (scr_coord_val y = clipped_area.y; y < clipped_area.y + clipped_area.h; ++y) {
+		uint8 *dst = img.access_pixel(0, y);
+		const PIXVAL *row = textur + 0 + y*disp_width;
+
+		for (scr_coord_val x = clipped_area.x; x < clipped_area.x + clipped_area.w; ++x) {
+			const PIXVAL pixel = *row++;
+
+#ifdef RGB555
+			*dst++ = ((pixel >> 10) & 0x1F) << (8-5); // R
+			*dst++ = ((pixel >>  5) & 0x1F) << (8-5); // G
+			*dst++ = ((pixel >>  0) & 0x1F) << (8-5); // B
+#else
+			*dst++ = ((pixel >> 11) & 0x1F) << (8-5); // R
+			*dst++ = ((pixel >>  5) & 0x3F) << (8-6); // G
+			*dst++ = ((pixel >>  0) & 0x1F) << (8-5); // B
+#endif
+		}
+	}
+
+	return img.write_png(filename);
 }

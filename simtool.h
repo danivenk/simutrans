@@ -237,9 +237,9 @@ private:
 class tool_plant_tree_t : public kartenboden_tool_t {
 public:
 	tool_plant_tree_t() : kartenboden_tool_t(TOOL_PLANT_TREE | GENERAL_TOOL) {}
-	image_id get_icon(player_t *) const OVERRIDE { return baum_t::get_count() > 0 ? icon : IMG_EMPTY; }
+	image_id get_icon(player_t *) const OVERRIDE { return tree_builder_t::get_num_trees() > 0 ? icon : IMG_EMPTY; }
 	char const* get_tooltip(player_t const*) const OVERRIDE { return translator::translate( "Plant tree" ); }
-	bool init(player_t*) OVERRIDE { return baum_t::get_count() > 0; }
+	bool init(player_t*) OVERRIDE { return tree_builder_t::has_trees(); }
 	char const* move(player_t* const player, uint16 const b, koord3d const k) OVERRIDE;
 	bool move_has_effects() const OVERRIDE { return true; }
 	char const* work(player_t*, koord3d) OVERRIDE;
@@ -288,7 +288,7 @@ private:
 protected:
 	const way_desc_t *desc;
 
-	virtual way_desc_t const* get_desc(uint16, bool) const;
+	virtual way_desc_t const* get_desc(uint16 timeline_year_month) const;
 	void calc_route( way_builder_t &bauigel, const koord3d &, const koord3d & );
 	void start_at( koord3d &new_start ) OVERRIDE;
 
@@ -310,7 +310,7 @@ private:
 	char const* do_work(player_t*, koord3d const&, koord3d const&) OVERRIDE;
 public:
 	tool_build_cityroad() : tool_build_way_t(TOOL_BUILD_CITYROAD | GENERAL_TOOL) {}
-	way_desc_t const* get_desc(uint16, bool) const OVERRIDE;
+	way_desc_t const* get_desc(uint16) const OVERRIDE;
 	image_id get_icon(player_t* const player) const OVERRIDE { return tool_t::get_icon(player); }
 	bool is_selected() const OVERRIDE { return tool_t::is_selected(); }
 	bool is_init_network_safe() const OVERRIDE { return true; }
@@ -589,9 +589,9 @@ public:
 class tool_forest_t : public two_click_tool_t {
 public:
 	tool_forest_t() : two_click_tool_t(TOOL_FOREST | GENERAL_TOOL) {}
-	image_id get_icon(player_t *) const  OVERRIDE { return baum_t::get_count() > 0 ? icon : IMG_EMPTY; }
+	image_id get_icon(player_t *) const  OVERRIDE { return tree_builder_t::has_trees() ? icon : IMG_EMPTY; }
 	char const* get_tooltip(player_t const*) const OVERRIDE { return translator::translate("Add forest"); }
-	bool init( player_t *player) OVERRIDE { return  baum_t::get_count() > 0  &&  two_click_tool_t::init(player); }
+	bool init( player_t *player) OVERRIDE { return  tree_builder_t::has_trees()  &&  two_click_tool_t::init(player); }
 private:
 	char const* do_work(player_t*, koord3d const&, koord3d const&) OVERRIDE;
 	void mark_tiles(player_t*, koord3d const&, koord3d const&) OVERRIDE;
@@ -940,10 +940,10 @@ class tool_fill_trees_t : public tool_t {
 public:
 	tool_fill_trees_t() : tool_t(TOOL_FILL_TREES | SIMPLE_TOOL) {}
 	char const* get_tooltip(player_t const*) const OVERRIDE { return translator::translate("Fill trees"); }
-	image_id get_icon(player_t *) const OVERRIDE { return baum_t::get_count() > 0 ? icon : IMG_EMPTY; }
+	image_id get_icon(player_t *) const OVERRIDE { return tree_builder_t::has_trees() ? icon : IMG_EMPTY; }
 	bool init(player_t * ) OVERRIDE {
-		if(  baum_t::get_count() > 0  &&  default_param  ) {
-			baum_t::fill_trees( atoi(default_param), 0, 0, welt->get_size().x, welt->get_size().y );
+		if(  tree_builder_t::has_trees()  &&  default_param  ) {
+			tree_builder_t::fill_trees( atoi(default_param), 0, 0, welt->get_size().x, welt->get_size().y );
 		}
 		return false;
 	}

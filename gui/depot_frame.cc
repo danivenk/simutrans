@@ -1279,9 +1279,6 @@ bool depot_frame_t::action_triggered( gui_action_creator_t *comp, value_t p)
 			if(  cnv.is_bound()  ) {
 				//first: close schedule (will update schedule on clients)
 				destroy_win( (ptrdiff_t)cnv->get_schedule() );
-				if(  cnv->get_line().is_bound()  ) {
-					destroy_win( (ptrdiff_t)cnv->get_line().get_rep() );
-				}
 				// only then call the tool to start
 				char tool = event_get_last_control_shift() == 2 ? 'B' : 'b'; // start all with CTRL-click
 				depot->call_depot_tool( tool, cnv, NULL);
@@ -1476,6 +1473,10 @@ bool depot_frame_t::infowin_event(const event_t *ev)
 		}
 
 		return true;
+	}
+
+	if (ev->ev_code == WIN_TOP) {
+		update_data();
 	}
 
 	if(  swallowed  &&  get_focus()==&name_filter_input  &&  (ev->ev_class == EVENT_KEYBOARD  ||  ev->ev_class == EVENT_STRING)  ) {

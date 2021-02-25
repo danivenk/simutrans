@@ -58,6 +58,9 @@
 #include "themeselector.h"
 #include "goods_frame_t.h"
 #include "loadfont_frame.h"
+#ifdef USE_FLUIDSYNTH_MIDI
+#include "loadsoundfont_frame.h"
+#endif
 #include "scenario_info.h"
 #include "depot_frame.h"
 #include "depotlist_frame.h"
@@ -497,6 +500,15 @@ gui_component_t *win_get_focus()
 }
 
 
+bool win_is_textinput()
+{
+	if(  gui_component_t *comp = win_get_focus()  ) {
+		return dynamic_cast<gui_textinput_t *>(comp) || dynamic_cast<gui_combobox_t *>(comp)  ||  dynamic_cast<gui_numberinput_t *>(comp);
+	}
+	return false;
+}
+
+
 int win_get_open_count()
 {
 	return wins.get_count();
@@ -573,6 +585,9 @@ void rdwr_all_win(loadsave_t *file)
 					case magic_factory_info:   w = new fabrik_info_t(); break;
 					case magic_goodslist:      w = new goods_frame_t(); break;
 					case magic_font:           w = new loadfont_frame_t(); break;
+#ifdef USE_FLUIDSYNTH_MIDI
+					case magic_soundfont:      w = new loadsoundfont_frame_t(); break;
+#endif
 					case magic_scenario_info:  w = new scenario_info_t(); break;
 					case magic_depot:          w = new depot_frame_t(); break;
 					case magic_convoi_list:    w = new convoi_frame_t(); break;
@@ -1500,6 +1515,7 @@ bool check_pos_win(event_t *ev)
 										koord3d k = wins[i].gui->get_weltpos(true);
 										if(  k!=koord3d::invalid  ) {
 											wl->get_viewport()->change_world_position( k );
+											wl->get_zeiger()->change_pos( k );
 										}
 									}
 									break;

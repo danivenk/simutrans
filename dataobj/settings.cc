@@ -1007,13 +1007,13 @@ void settings_t::parse_simuconf( tabfile_t& simuconf, sint16& disp_width, sint16
 	env_t::player_finance_display_account = contents.get_int( "player_finance_display_account", env_t::player_finance_display_account ) != 0;
 
 	// network stuff
-	env_t::server_frames_ahead = contents.get_int( "server_frames_ahead", env_t::server_frames_ahead );
-	env_t::additional_client_frames_behind = contents.get_int( "additional_client_frames_behind", env_t::additional_client_frames_behind );
-	env_t::network_frames_per_step = contents.get_int( "server_frames_per_step", env_t::network_frames_per_step );
-	env_t::server_sync_steps_between_checks = contents.get_int( "server_frames_between_checks", env_t::server_sync_steps_between_checks );
-	env_t::pause_server_no_clients = contents.get_int( "pause_server_no_clients", env_t::pause_server_no_clients );
-	env_t::server_save_game_on_quit = contents.get_int( "server_save_game_on_quit", env_t::server_save_game_on_quit );
-	env_t::reload_and_save_on_quit = contents.get_int( "reload_and_save_on_quit", env_t::reload_and_save_on_quit );
+	env_t::server_frames_ahead              = max(0, contents.get_int( "server_frames_ahead",             env_t::server_frames_ahead ));
+	env_t::additional_client_frames_behind  = max(0, contents.get_int( "additional_client_frames_behind", env_t::additional_client_frames_behind ));
+	env_t::network_frames_per_step          = max(1, contents.get_int( "server_frames_per_step",          env_t::network_frames_per_step ));
+	env_t::server_sync_steps_between_checks = max(1, contents.get_int( "server_frames_between_checks",    env_t::server_sync_steps_between_checks ));
+	env_t::pause_server_no_clients          =        contents.get_int( "pause_server_no_clients",         env_t::pause_server_no_clients )  != 0;
+	env_t::server_save_game_on_quit         =        contents.get_int( "server_save_game_on_quit",        env_t::server_save_game_on_quit ) != 0;
+	env_t::reload_and_save_on_quit          =        contents.get_int( "reload_and_save_on_quit",         env_t::reload_and_save_on_quit )  != 0;
 
 	env_t::server_announce = contents.get_int( "announce_server", env_t::server_announce );
 	if( !env_t::server ) {
@@ -1403,7 +1403,7 @@ void settings_t::parse_simuconf( tabfile_t& simuconf, sint16& disp_width, sint16
 	if( test < 2 ) {
 		tree = !test;
 	}
-	tree = contents.get_int( "trees_distribution", tree );
+	tree = contents.get_int( "tree_distribution", tree );
 	lake_height = (contents.get_int("no_lakes", (lake_height == 0) )) ? 0 : 8;
 	lake_height = contents.get_int("lake_height", lake_height );
 
@@ -1564,6 +1564,11 @@ void settings_t::parse_simuconf( tabfile_t& simuconf, sint16& disp_width, sint16
 
 	// Default pak file path
 	objfilename = ltrim(contents.get_string("pak_file_path", "" ) );
+
+	// FluidSynth MIDI parameters
+	if(  *contents.get("soundfont_filename")  ) {
+		env_t::soundfont_filename = ltrim(contents.get("soundfont_filename"));
+	}
 
 	printf("Reading simuconf.tab successful!\n" );
 }

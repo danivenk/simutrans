@@ -174,6 +174,28 @@ class ship_connector_t extends manager_t
 						//local err = command_x.build_road(pl, starts_field, c_depot, planned_way, false, true)
 					} else {
 						// depot already existing ?
+
+						local depot_tiles = []
+						local tile_range = 4
+						depot_tiles.append(tile_x(c_start[0].x-tile_range, c_start[0].y-tile_range, c_start[0].z))
+						depot_tiles.append(tile_x(c_start[0].x+tile_range, c_start[0].y-tile_range, c_start[0].z))
+						depot_tiles.append(tile_x(c_start[0].x-tile_range, c_start[0].y+tile_range, c_start[0].z))
+						depot_tiles.append(tile_x(c_start[0].x+tile_range, c_start[0].y+tile_range, c_start[0].z))
+						for ( local i = 0; i < depot_tiles.len(); i++ ) {
+							//gui.add_message_at(pl, "depot_tiles[i].is_water() " + coord_to_string(depot_tiles[i]) + " " + depot_tiles[i].is_water(), depot_tiles[i])
+							//gui.add_message_at(pl, "depot_tiles[i].is_empty() " + coord_to_string(depot_tiles[i]) + " " + depot_tiles[i].is_empty(), depot_tiles[i])
+							local tile_halt = ::halt_x.get_halt(depot_tiles[i], player_x(1))
+							if ( tile_halt != null ) {
+								//gui.add_message_at(pl, "tile_halt.get_halt() " + coord_to_string(depot_tiles[i]) + " " + tile_halt.get_halt(player_x(1)), depot_tiles[i])
+							}
+
+							if ( depot_tiles[i].is_water() && tile_halt == null && depot_tiles[i].get_objects().get_count()==0 ) { //
+								c_depot = depot_tiles[i]
+								//gui.add_message_at(pl, "depot tile " + coord_to_string(c_depot), c_depot)
+								break
+							}
+						}
+
 						if (c_depot.find_object(mo_depot_water) == null) {
 							// no: build
 							local err = command_x.build_depot(pl, c_depot, planned_depot )
@@ -225,7 +247,7 @@ class ship_connector_t extends manager_t
 					c.p_depot  = depot_x(c_depot.x, c_depot.y, c_depot.z)
 					c.p_line   = c_line
 					c.p_convoy = planned_convoy
-					c.p_count  = min(planned_convoy.nr_convoys, 3)
+					c.p_count  = min(planned_convoy.nr_convoys, 1) // 1 ship to begin
 					append_child(c)
 
 					local toc = get_ops_total();
@@ -236,6 +258,20 @@ class ship_connector_t extends manager_t
 					return r_t(RT_PARTIAL_SUCCESS)
 				}
 			case 9: // build station extension
+				{
+					// optimize way line save in c_route
+					//if ( tile_x(c_start.x, c_start.y, c_start.z).find_object(mo_building) != null && tile_x(c_end.x, c_end.y, c_end.z).find_object(mo_building) != null && c_route.len() > 0 ) {
+
+						// rename line
+						local line_name = c_line.get_name()
+						local str_search = ") " + translate("Line")
+						local st_names = c_line.get_schedule().entries
+						if ( line_name.find(str_search) != null ) {
+							local new_name = translate("Ship") + " " + translate(freight) + " " + st_names[0].get_halt(pl).get_name() + " - " + st_names[1].get_halt(pl).get_name()
+							c_line.set_name(new_name)
+						}
+					//}
+				}
 		}
 
 		if (finalize) {
