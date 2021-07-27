@@ -96,7 +96,7 @@ public:
 	 * an error message, leaving the language as it is
 	 */
 	static void set_language(int lang);
-	static void set_language(const char* iso);
+	static bool set_language(const char* iso);
 
 	/**
 	 * Returns the number of loaded languages.
@@ -126,7 +126,9 @@ public:
 	// return date in selected format
 	static const char *get_date(uint16 year, uint16 month);
 	static const char *get_date(uint16 year, uint16 month, uint16 day, char const* season);
-	static const char *get_short_date(uint16 year, uint16 month);
+	static const char* get_short_date(uint16 year, uint16 month);
+	static const char* get_month_date(uint16 month, uint16 day);
+	static const char* get_day_date( uint16 day );
 };
 
 #endif

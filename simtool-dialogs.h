@@ -52,6 +52,7 @@
 #include "gui/script_tool_frame.h"
 
 #include "obj/baum.h"
+#include "obj/groundobj.h"
 
 
 class player_t;
@@ -80,7 +81,7 @@ public:
 	char const* get_tooltip(player_t const*) const OVERRIDE{ return translator::translate("Einstellungen aendern"); }
 	bool is_selected() const OVERRIDE{ return win_get_magic(magic_optionen_gui_t); }
 	bool init(player_t*) OVERRIDE{
-		create_win(240, 120, new optionen_gui_t(), w_info, magic_optionen_gui_t);
+		create_win(-1, -1, new optionen_gui_t(), w_info, magic_optionen_gui_t, true);
 		return false;
 	}
 	bool exit(player_t*) OVERRIDE{ destroy_win(magic_optionen_gui_t); return false; }
@@ -336,12 +337,12 @@ class dialog_list_halt_t : public tool_t {
 public:
 	dialog_list_halt_t() : tool_t(DIALOG_LIST_HALT | DIALOGE_TOOL) {}
 	char const* get_tooltip(player_t const*) const OVERRIDE{ return translator::translate("hl_title"); }
-	bool is_selected() const OVERRIDE{ return win_get_magic(magic_halt_list_t + welt->get_active_player_nr()); }
+	bool is_selected() const OVERRIDE{ return win_get_magic(magic_halt_list + welt->get_active_player_nr()); }
 	bool init(player_t* player) OVERRIDE{
-		create_win(new halt_list_frame_t(player), w_info, magic_halt_list_t + player->get_player_nr());
+		create_win(new halt_list_frame_t(), w_info, magic_halt_list + player->get_player_nr());
 		return false;
 	}
-	bool exit(player_t* player) OVERRIDE{ destroy_win(magic_halt_list_t + player->get_player_nr()); return false; }
+	bool exit(player_t* player) OVERRIDE{ destroy_win(magic_halt_list + player->get_player_nr()); return false; }
 	bool is_init_network_safe() const OVERRIDE{ return true; }
 	bool is_work_network_safe() const OVERRIDE{ return true; }
 };
@@ -512,7 +513,7 @@ public:
 	image_id get_icon(player_t *) const OVERRIDE { return tree_builder_t::has_trees() ? icon : IMG_EMPTY; }
 	bool is_selected() const OVERRIDE{ return win_get_magic(magic_edit_tree); }
 	bool init(player_t* player) OVERRIDE{
-		if (tree_builder_t::has_trees() > 0 && !is_selected()) {
+		if(  tree_builder_t::has_trees()  && !is_selected()  ) {
 			create_win(new baum_edit_frame_t(player), w_info, magic_edit_tree);
 		}
 		return false;

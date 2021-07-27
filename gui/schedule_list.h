@@ -11,8 +11,8 @@
 #include "components/gui_combobox.h"
 #include "components/gui_textinput.h"
 #include "components/gui_scrolled_list.h"
-#include "components/gui_tab_panel.h"
 #include "components/gui_convoiinfo.h"
+#include "components/gui_waytype_tab_panel.h"
 #include "../tpl/vector_tpl.h"
 #include "../tpl/minivec_tpl.h"
 #include "../simline.h"
@@ -28,13 +28,14 @@ class schedule_list_gui_t : public gui_frame_t, public action_listener_t
 private:
 	player_t *player;
 
-	button_t bt_new_line;
+	button_t bt_new_line, bt_delete_line, bt_single_line;
 	gui_scrolled_list_t scl;
 	gui_textinput_t inp_filter;
 	button_t filterButtons[MAX_LINE_COST];
-	gui_tab_panel_t tabs;
+	gui_waytype_tab_panel_t tabs;
 
 	gui_combobox_t freight_type_c, sort_type_c;
+	button_t sorteddir;
 
 	uint32 old_line_count;
 
@@ -45,7 +46,7 @@ private:
 	bool is_matching_freight_catg( const minivec_tpl<uint8> &goods_catg_index );
 
 	uint8 current_sort_mode;
-	void build_line_list(int filter);
+	void build_line_list(simline_t::linetype filter);
 
 	// last active line
 	linehandle_t line;

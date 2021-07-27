@@ -36,7 +36,7 @@ event_class_t last_meta_event_get_class()
  * so the origin keeps pointing to the window top bar.
  *  Mainly to prevent copied, double code.
  */
-void change_drag_start(int x, int y)
+void change_drag_start(scr_coord_val x, scr_coord_val y)
 {
 	cx += x;
 	cy += y;
@@ -156,7 +156,7 @@ static void fill_event(event_t* const ev)
 		case SIM_SYSTEM:
 			ev->ev_class        = EVENT_SYSTEM;
 			ev->ev_code         = sys_event.code;
-			ev->new_window_size = sys_event.new_window_size;
+			ev->new_window_size = scr_size(sys_event.new_window_size_w, sys_event.new_window_size_h);
 			break;
 	}
 

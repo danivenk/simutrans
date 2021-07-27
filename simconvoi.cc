@@ -141,6 +141,7 @@ void convoi_t::init(player_t *player)
 	next_wolke = 0;
 
 	state = INITIAL;
+	unloading_state = false;
 
 	*name_and_id = 0;
 	name_offset = 0;
@@ -158,6 +159,7 @@ void convoi_t::init(player_t *player)
 	sp_soll = 0;
 
 	next_stop_index = 65535;
+	last_load_tick = 0;
 
 	line_update_pending = linehandle_t();
 
@@ -992,7 +994,6 @@ sync_result convoi_t::sync_step(uint32 delta_t)
 
 		default:
 			dbg->fatal("convoi_t::sync_step()", "Wrong state %d!\n", state);
-			break;
 	}
 
 	return SYNC_OK;
@@ -1353,25 +1354,32 @@ void convoi_t::step()
 		// just waiting for action here
 		case INITIAL:
 			welt->sync.remove(this);
-			/* FALLTHROUGH */
+			// FALLTHROUGH
 		case EDIT_SCHEDULE:
 		case NO_ROUTE:
 			wait_lock = max( wait_lock, 25000 );
 			break;
 
-		// action soon needed
+		// Same as waiting for free way
 		case ROUTING_1:
+			// immediate start required
+			if (wait_lock == 0) break;
+			// FALLTHROUGH
 		case CAN_START:
 		case WAITING_FOR_CLEARANCE:
-			wait_lock = max( wait_lock, 500 );
-			break;
+			// unless a longer wait is requested
+			if (wait_lock > 2500) {
+				break;
+			}
+			// FALLTHROUGH
 
 		// waiting for free way, not too heavy, not to slow
 		case CAN_START_ONE_MONTH:
 		case WAITING_FOR_CLEARANCE_ONE_MONTH:
 		case CAN_START_TWO_MONTHS:
 		case WAITING_FOR_CLEARANCE_TWO_MONTHS:
-			wait_lock = 2500;
+			// to avoid having a convoi stuck at a heavy traffic intersection/signal, the waiting time is randomized
+			wait_lock = simrand(5000)+1;
 			break;
 		default: ;
 	}
@@ -2590,6 +2598,7 @@ void convoi_t::rdwr(loadsave_t *file)
 	if(  file->is_loading()  ) {
 		reserve_route();
 		recalc_catg_index();
+		unloading_state = false;
 	}
 }
 
@@ -2614,7 +2623,7 @@ void convoi_t::open_info_window()
 		}
 	}
 	else {
-		if(  env_t::verbose_debug  ) {
+		if(  env_t::verbose_debug >= log_t::LEVEL_ERROR  ) {
 			dump();
 		}
 		create_win( new convoi_info_t(self), w_info, magic_convoi_info+self.get_id() );
@@ -2630,7 +2639,7 @@ void convoi_t::info(cbuffer_t & buf) const
 
 		buf.printf("\n %d/%dkm/h (%1.2f$/km)\n", speed_to_kmh(min_top_speed), v->get_desc()->get_topspeed(), get_running_cost() / 100.0);
 		buf.printf(" %s: %ikW\n", translator::translate("Leistung"), sum_power);
-		buf.printf(" %s: %i (%i) t\n", translator::translate("Gewicht"), sum_weight, sum_gesamtweight - sum_weight);
+		buf.printf(" %s: %ld (%ld) t\n", translator::translate("Gewicht"), (long)sum_weight, (long)(sum_gesamtweight - sum_weight));
 		buf.printf(" %s: ", translator::translate("Gewinn"));
 		money_to_string(tmp, (double)jahresgewinn);
 		buf.append(tmp);
@@ -2695,7 +2704,7 @@ void convoi_t::get_freight_info(cbuffer_t & buf)
 
 		// apend info on total capacity
 		slist_tpl <ware_t>capacity;
-		for (size_t i = 0; i != n; ++i) {
+		for (uint16 i = 0; i != n; ++i) {
 			if(max_loaded_waren[i]>0  &&  i!=goods_manager_t::INDEX_NONE) {
 				ware_t ware(goods_manager_t::get_info(i));
 				ware.menge = max_loaded_waren[i];
@@ -2720,7 +2729,7 @@ void convoi_t::get_freight_info(cbuffer_t & buf)
 
 void convoi_t::open_schedule_window( bool show )
 {
-	DBG_MESSAGE("convoi_t::open_schedule_window()","Id = %ld, State = %d, Lock = %d",self.get_id(), state, wait_lock);
+	DBG_MESSAGE("convoi_t::open_schedule_window()","Id = %hu, State = %d, Lock = %d", self.get_id(), (int)state, wait_lock);
 
 	// manipulation of schedule not allowed while:
 	// - just starting
@@ -2744,13 +2753,16 @@ void convoi_t::open_schedule_window( bool show )
 	wait_lock = 25000;
 	alte_richtung = fahr[0]->get_direction();
 
+	ptrdiff_t magic = (ptrdiff_t)(magic_convoi_info + self.get_id());
 	if(  show  ) {
 		// Open schedule dialog
-		if( convoi_info_t *info = dynamic_cast<convoi_info_t*>(win_get_magic( magic_convoi_info + self.get_id() )) ) {
+		if(  convoi_info_t *info = dynamic_cast<convoi_info_t*>(win_get_magic( magic )) ) {
 			info->change_schedule();
+			top_win(info);
 		}
 		else {
-			create_win( new convoi_info_t(self,true), w_info, (ptrdiff_t)schedule );
+			create_schedule();
+			create_win( new convoi_info_t(self,true), w_info, magic );
 		}
 		// TODO: what happens if no client opens the window??
 	}
@@ -2840,6 +2852,24 @@ void convoi_t::calc_gewinn()
 		book(gewinn, CONVOI_REVENUE);
 	}
 }
+
+
+
+uint32 convoi_t::get_departure_ticks() const
+{
+	// we need to make it this complicated, otherwise times versus the end of a month could be missed
+	uint32 arrived_month_tick = arrived_time & ~(welt->ticks_per_world_month - 1);
+	uint32 arrived_ticks = arrived_time - arrived_month_tick;
+	uint32 departure_ticks = schedule->get_current_entry().get_waiting_ticks();
+	// if there is less than half a month to wait we will assume we arrived early, else we this we are late ...
+	if (arrived_ticks > departure_ticks &&  // we are late
+		(arrived_ticks - departure_ticks) > (welt->ticks_per_world_month / 2)) {
+		// but we are more than half a month later => assume the departure is scheduled for next month
+		arrived_month_tick += welt->ticks_per_world_month;
+	}
+	return arrived_month_tick + departure_ticks;
+}
+
 
 
 /**
@@ -2933,11 +2963,21 @@ station_tile_search_ready: ;
 	// only load vehicles in station
 	// don't load when vehicle is being withdrawn
 	bool changed_loading_level = false;
+	unloading_state = true;
 	uint32 time = WTT_LOADING; // min time for loading/unloading
 	sint64 gewinn = 0;
 
+	uint32 current_tick = welt->get_ticks();
+	if (fahr[0]->last_stop_pos != fahr[0]->get_pos()  ||  last_load_tick==0) {
+		// first stop here, so no time passed yet
+		last_load_tick = current_tick;
+	}
+	const uint32 loading_ms = current_tick - last_load_tick;
+	last_load_tick = current_tick;
+
 	// cargo type of previous vehicle that could not be filled
 	const goods_desc_t* cargo_type_prev = NULL;
+	bool wants_more = false;
 
 	for(unsigned i=0; i<vehicles_loading; i++) {
 		vehicle_t* v = fahr[i];
@@ -2951,13 +2991,22 @@ station_tile_search_ready: ;
 			v->last_stop_pos = v->get_pos();
 		}
 
-		uint16 amount = v->unload_cargo(halt, next_depot  );
+		// has no freight ...
+		if (fahr[i]->get_cargo_max() == 0) {
+			continue;
+		}
 
-		if(  !no_load  &&  !next_depot  &&  v->get_total_cargo() < v->get_cargo_max()  ) {
-			// load if: unloaded something (might go back) or previous non-filled car requested different cargo type
-			if (amount>0  ||  cargo_type_prev==NULL  ||  !cargo_type_prev->is_interchangeable(v->get_cargo_type())) {
+		uint32 min_loading_step_time = v->get_desc()->get_loading_time() / v->get_cargo_max() + 1;
+		time = max(time, min_loading_step_time);
+		uint16 max_amount = next_depot ? 32767 : (v->get_cargo_max() * loading_ms) / ((uint32)v->get_desc()->get_loading_time() + 1) + 1;
+		uint16 amount = v->unload_cargo(halt, next_depot, max_amount );
+
+		if(  max_amount>amount  &&  !no_load  &&  !next_depot  &&  v->get_total_cargo() < v->get_cargo_max()  ) {
+			// load if: not unloaded something first or not filled and not forbidden (no_load or next is depot)
+			if(cargo_type_prev==NULL  ||  !cargo_type_prev->is_interchangeable(v->get_cargo_type())) {
 				// load
-				amount += v->load_cargo(halt, destination_halts);
+				amount += v->load_cargo(halt, destination_halts, max_amount-amount);
+				unloading_state &= amount==0;
 			}
 			if (v->get_total_cargo() < v->get_cargo_max()) {
 				// not full
@@ -2966,11 +3015,12 @@ station_tile_search_ready: ;
 		}
 
 		if(  amount  ) {
-			time = max( time, (amount*v->get_desc()->get_loading_time()) / max(v->get_cargo_max(), 1) );
 			v->mark_image_dirty(v->get_image(), 0);
 			v->calc_image();
 			changed_loading_level = true;
 		}
+
+		wants_more |= (amount == max_amount)  &&  (v->get_total_cargo() < v->get_cargo_max());
 	}
 	freight_info_resort |= changed_loading_level;
 	if(  changed_loading_level  ) {
@@ -2980,6 +3030,10 @@ station_tile_search_ready: ;
 	// any unloading/loading went on?
 	if(  changed_loading_level  ) {
 		calc_loading();
+	}
+	else {
+		// nothing to unload or load: waiting for cargo
+		unloading_state = false;
 	}
 	loading_limit = schedule->get_current_entry().minimum_loading;
 
@@ -2998,6 +3052,40 @@ station_tile_search_ready: ;
 
 		book(gewinn, CONVOI_PROFIT);
 		book(gewinn, CONVOI_REVENUE);
+	}
+
+	wait_lock = time;
+
+	// if we check here we will continue loading even if the departure is delayed
+	if (wants_more  &&  !welt->get_settings().get_departures_on_time()  ) {
+		// not yet fully unloaded/loaded
+		return;
+	}
+
+	// find out if there is a times departure pending => depart
+	if(  schedule->get_current_entry().minimum_loading == 0  &&  schedule->get_current_entry().waiting_time > 0  ) {
+
+		if(  welt->get_ticks() > get_departure_ticks()  ) {
+
+			// add available capacity after loading(!) to statistics
+			for (unsigned i = 0; i < anz_vehikel; i++) {
+				book(get_vehikel(i)->get_cargo_max() - get_vehikel(i)->get_total_cargo(), CONVOI_CAPACITY);
+			}
+
+			// Advance schedule
+			schedule->advance();
+			state = ROUTING_1;
+			loading_limit = 0;
+			wait_lock = 0;
+		}
+
+		// else continue loading (even if full until departure time reached)
+		return;
+	}
+
+	if (wants_more) {
+		// not yet fully unloaded/loaded => continue loading
+		return;
 	}
 
 	// loading is finished => maybe drive on
@@ -3023,10 +3111,8 @@ station_tile_search_ready: ;
 		loading_limit = 0;
 	}
 
-	INT_CHECK( "convoi_t::hat_gehalten" );
+	INT_CHECK("convoi_t::hat_gehalten");
 
-	// at least wait the minimum time for loading
-	wait_lock = time;
 }
 
 

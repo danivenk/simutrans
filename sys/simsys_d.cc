@@ -14,6 +14,7 @@
 #include "../simevent.h"
 #include "../display/simgraph.h"
 #include "../simversion.h"
+#include "../simdebug.h"
 
 #include <allegro.h>
 
@@ -186,7 +187,7 @@ bool dr_auto_scale(bool)
  * Hier sind die Basisfunktionen zur Initialisierung der Schnittstelle untergebracht
  * -> init,open,close
  */
-bool dr_os_init(int const* parameter)
+bool dr_os_init(const int *)
 {
 	if (allegro_init() != 0) {
 		dr_fatal_notify("Could not init Allegro.\n");
@@ -227,17 +228,16 @@ int dr_os_open(int const w, int const h, bool fullscreen)
 	width = w;
 	height = h;
 
-
 	install_keyboard();
 
 	set_color_depth(COLOUR_DEPTH);
 	if (set_gfx_mode(fullscreen ? GFX_AUTODETECT : GFX_AUTODETECT_WINDOWED, w, h, 0, 0) != 0) {
-		fprintf(stderr, "Error: %s\n", allegro_error);
+		dbg->error("dr_os_open(allegro)", "Cannot set_gfx_mode: %s", allegro_error);
 		return 0;
 	}
 
 	if (install_mouse() < 0) {
-		fprintf(stderr, "Cannot init. mouse: no driver ?");
+		dbg->error("dr_os_open(allegro)", "Cannot initialize mouse: no driver?");
 		return 0;
 	}
 
@@ -250,7 +250,6 @@ int dr_os_open(int const w, int const h, bool fullscreen)
 	sys_event.my = mouse_y;
 
 	set_window_title(SIM_TITLE);
-
 	return w;
 }
 
@@ -271,8 +270,7 @@ unsigned short* dr_textur_init()
 {
 	texture_map = create_bitmap(width, height);
 	if (texture_map == NULL) {
-		printf("Error: can't create double buffer bitmap, aborting!");
-		exit(1);
+		dbg->fatal("dr_textur_init(allegro)", "Cannot create double buffer bitmap, aborting!");
 	}
 
 //	return reinterpret_cast<unsigned short*>(texture_map->line[0]);
@@ -327,7 +325,7 @@ void move_pointer(int x, int y)
 }
 
 
-void set_pointer(int loading)
+void set_pointer(int)
 {
 	// not supported
 }
@@ -335,11 +333,11 @@ void set_pointer(int loading)
 
 static inline int recalc_keys()
 {
-	int mod = key_shifts;
+	const int mod = key_shifts;
 
 	return
-		(mod & KB_SHIFT_FLAG ? 1 : 0) |
-		(mod & KB_CTRL_FLAG  ? 2 : 0);
+		((mod & KB_SHIFT_FLAG) ? SIM_MOD_SHIFT : SIM_MOD_NONE) |
+		((mod & KB_CTRL_FLAG)  ? SIM_MOD_CTRL  : SIM_MOD_NONE);
 }
 
 
@@ -397,7 +395,7 @@ void GetEventsNoWait()
 }
 
 
-void show_pointer(int yesno)
+void show_pointer(int)
 {
 }
 
@@ -420,23 +418,22 @@ END_OF_FUNCTION(timer_callback)
 
 static void simtimer_init()
 {
-	printf("Installing timer...\n");
+	dbg->message("simtimer_init(allegro)", "Installing timer...");
 
 	LOCK_VARIABLE(milli_counter);
 	LOCK_FUNCTION(timer_callback);
 
-	printf("Preparing timer ...\n");
+	dbg->message("simtimer_init(allegro)", "Preparing timer...");
 
 	install_timer();
 
-	printf("Starting timer...\n");
+	dbg->message("simtimer_init(allegro)", "Starting timer...");
 
 	if (install_int(timer_callback, 5) == 0) {
-		printf("Timer installed.\n");
+		dbg->message("simtimer_init(allegro)", "Timer installed.");
 	}
 	else {
-		dr_fatal_notify("Error: Timer not available, aborting.\n");
-		exit(1);
+		dbg->fatal("simtimer_init(allegro)", "Timer not available, aborting.");
 	}
 }
 

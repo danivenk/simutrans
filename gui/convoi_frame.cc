@@ -72,15 +72,7 @@ public:
 
 	void sort()
 	{
-/*
-		// set visibility according to filter
-		for(  vector_tpl<gui_component_t*>::iterator iter = item_list.begin();  iter != item_list.end();  ++iter) {
-			gui_convoiinfo_t *a = dynamic_cast<gui_convoiinfo_t*>(*iter);
-
-			a->set_visible( main->passes_filter(a->get_cnv()) );
-		}
-
-*/		main_static = main;
+		main_static = main;
 		gui_scrolled_list_t::sort(0);
 	}
 
@@ -194,8 +186,7 @@ void convoi_frame_t::fill_list()
 void convoi_frame_t::sort_list()
 {
 	scrolly->sort();
-	sortedby.set_text(sort_text[get_sortierung()]);
-	sorteddir.set_text( get_reverse() ? "cl_btn_sort_desc" : "cl_btn_sort_asc");
+	sortedby.set_selection(sortby);
 }
 
 
@@ -214,25 +205,30 @@ convoi_frame_t::convoi_frame_t() :
 
 	set_table_layout(1,0);
 
-	add_table(5,2);
+	add_table(4,2);
 	{
-		new_component_span<gui_label_t>("cl_txt_sort", 2);
+		new_component<gui_label_t>("Filter:");
 		name_filter_input.set_text( name_filter, lengthof(name_filter) );
-		add_component(&name_filter_input,2);
-		new_component<gui_fill_t>();
-
-		sortedby.init(button_t::roundbox, sort_text[get_sortierung()]);
-		sortedby.add_listener(this);
-		add_component(&sortedby);
-
-		sorteddir.init(button_t::roundbox, get_reverse() ? "cl_btn_sort_desc" : "cl_btn_sort_asc");
-		sorteddir.add_listener(this);
-		add_component(&sorteddir);
-
-		new_component<gui_label_t>("Filter:",ALIGN_RIGHT);
+		add_component(&name_filter_input);
 		filter_details.init(button_t::roundbox, "cl_btn_filter_settings");
 		filter_details.add_listener(this);
 		add_component(&filter_details);
+		new_component<gui_fill_t>();
+
+		new_component<gui_label_t>("cl_txt_sort");
+		sortedby.set_unsorted(); // do not sort
+		for(  size_t i=0;  i < lengthof(sort_text);  i++  ) {
+			sortedby.new_component<gui_scrolled_list_t::const_text_scrollitem_t>(translator::translate(sort_text[i]),SYSCOL_TEXT);
+		}
+		sortedby.set_selection(get_sortierung());
+		sortedby.add_listener(this);
+		add_component(&sortedby);
+
+		sorteddir.init(button_t::sortarrow_automatic, NULL);
+		sorteddir.add_listener(this);
+		sorteddir.pressed = get_reverse();
+		add_component(&sorteddir);
+
 		new_component<gui_fill_t>();
 	}
 	end_table();
@@ -241,7 +237,7 @@ convoi_frame_t::convoi_frame_t() :
 	scrolly->set_maximize( true );
 
 	tabs.init_tabs(scrolly);
-	for(  int i = 0;  i < tabs.get_count();  i++  ) {
+	for(  uint32 i = 0;  i < tabs.get_count();  i++  ) {
 		if(current_wt == tabs.get_tab_waytype(i)) {
 			tabs.set_active_tab_index(i);
 			break;
@@ -303,6 +299,7 @@ bool convoi_frame_t::action_triggered( gui_action_creator_t *comp, value_t /* */
 void convoi_frame_t::draw(scr_coord pos, scr_size size)
 {
 	filter_details.pressed = win_get_magic( magic_convoi_list_filter+owner->get_player_nr() );
+	sorteddir.pressed = get_reverse();
 
 	if (last_world_convois != welt->convoys().get_count()  ||  strcmp(last_name_filter,name_filter)) {
 		strcpy( last_name_filter, name_filter );
@@ -333,8 +330,8 @@ void convoi_frame_t::rdwr( loadsave_t *file )
 		file->rdwr_byte( good_nr );
 		if (good_nr > 0) {
 			FOR( slist_tpl<const goods_desc_t *>, const i, *waren_filter ) {
-				uint8 catg_idx = i->get_catg_index();
-				file->rdwr_byte(catg_idx);
+				char *name = const_cast<char *>(i->get_name());
+				file->rdwr_str(name,256);
 			}
 		}
 	}
@@ -344,18 +341,19 @@ void convoi_frame_t::rdwr( loadsave_t *file )
 		if( good_nr > 0 ) {
 			static slist_tpl<const goods_desc_t *>waren_filter_rd;
 			for( sint16 i = 0; i < good_nr; i++ ) {
-				uint8 catg_idx;
-				file->rdwr_byte(catg_idx);
-				waren_filter_rd.append( goods_manager_t::get_info_catg(catg_idx) );
+				char name[256];
+				file->rdwr_str(name, lengthof(name));
+				if (const goods_desc_t *gd = goods_manager_t::get_info(name)) {
+					waren_filter_rd.append(gd);
+				}
 			}
 			waren_filter = &waren_filter_rd;
 		}
-	}
 
-	if( file->is_loading() ) {
 		sortby = (sort_mode_t)sort_mode;
 		owner = welt->get_player( player_nr );
 		win_set_magic(this, magic_convoi_list+player_nr );
+		current_wt = tabs.get_active_tab_waytype();
 		fill_list();
 		set_windowsize( size );
 	}

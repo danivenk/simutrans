@@ -17,6 +17,9 @@
 #include "../utils/simrandom.h"
 void rdwr_win_settings(loadsave_t *file); // simwin
 
+sint16 env_t::menupos = MENU_TOP;
+bool env_t::reselect_closes_tool = true;
+
 sint8 env_t::pak_tile_height_step = 16;
 sint8 env_t::pak_height_conversion_factor = 1;
 env_t::height_conversion_mode env_t::height_conv_mode = env_t::HEIGHT_CONV_LINEAR;
@@ -117,11 +120,12 @@ bool env_t::tree_info;
 bool env_t::ground_info;
 bool env_t::townhall_info;
 bool env_t::single_info;
+bool env_t::single_line_gui;
 bool env_t::window_buttons_right;
 bool env_t::second_open_closes_win;
 bool env_t::remember_window_positions;
 bool env_t::window_frame_active;
-uint8 env_t::verbose_debug;
+log_t::level_t env_t::verbose_debug;
 uint8 env_t::default_sortmode;
 uint32 env_t::default_mapmode;
 uint8 env_t::show_month;
@@ -176,7 +180,6 @@ uint32 env_t::default_ai_construction_speed;
 bool env_t::hide_keyboard = false;
 
 
-
 // Define default settings.
 void env_t::init()
 {
@@ -217,6 +220,7 @@ void env_t::init()
 	ground_info = false;
 	townhall_info = false;
 	single_info = true;
+	single_line_gui = false;
 
 	window_buttons_right = false;
 	window_frame_active = false;
@@ -224,7 +228,7 @@ void env_t::init()
 	remember_window_positions = true;
 
 	// debug level (0: only fatal, 1: error, 2: warning, 3: all
-	verbose_debug = 0;
+	verbose_debug = log_t::LEVEL_FATAL;
 
 	default_sortmode = 1; // sort by amount
 	default_mapmode = 0;  // show cities
@@ -298,7 +302,7 @@ void env_t::init()
 	// upper right
 	compass_map_position = ALIGN_RIGHT|ALIGN_TOP;
 	// lower right
-	compass_screen_position = 0, // disbale, other could be ALIGN_RIGHT|ALIGN_BOTTOM;
+	compass_screen_position = 0; // disbale, other could be ALIGN_RIGHT|ALIGN_BOTTOM;
 
 	// Listen on all addresses by default
 	listen.append_unique("::");
@@ -537,6 +541,7 @@ void env_t::rdwr(loadsave_t *file)
 		file->rdwr_byte( gui_player_color_dark );
 		file->rdwr_byte( gui_player_color_bright );
 	}
+
 	if( file->is_version_atleast( 122, 1 ) ) {
 		file->rdwr_bool( env_t::numpad_always_moves_map );
 
@@ -545,6 +550,12 @@ void env_t::rdwr(loadsave_t *file)
 		if(  file->is_loading()  ) {
 			soundfont_filename = str ? str.c_str() : "";
 		}
+
+		file->rdwr_short(env_t::menupos);
+		env_t::menupos &= 3;
+		file->rdwr_bool( reselect_closes_tool );
+
+		file->rdwr_bool( single_line_gui );
 	}
 
 	// server settings are not saved, since they are server specific

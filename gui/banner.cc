@@ -22,12 +22,8 @@
 #include "server_frame.h"
 #include "components/gui_image.h"
 
-#define L_LINESPACE_EXTRA_2  ( LINESPACE + 2 )
-#define L_LINESPACE_EXTRA_5  ( LINESPACE + 5 )
-#define L_LINESPACE_EXTRA_7  ( LINESPACE + 7 )
 
 // Local adjustments
-#define L_TEXT_INDENT        ( 24 )                            // Shadow text indent
 #define L_BANNER_ROWS        ( 5 )                             // Rows of scroll text
 #define L_BANNER_TEXT_INDENT ( 4 )                             // Scroll text padding (left/right)
 #define L_BANNER_HEIGHT      ( L_BANNER_ROWS * LINESPACE + 2 ) // Banner control height in pixels
@@ -98,9 +94,9 @@ banner_t::banner_t() : gui_frame_t("")
 	{
 		new_component<gui_fill_t>();
 		add_table(1,0);
-		new_component<gui_label_t>("http://www.simutrans.com", SYSCOL_TEXT_HIGHLIGHT, gui_label_t::left)->set_shadow(SYSCOL_TEXT_SHADOW, true);
-		new_component<gui_label_t>("http://forum.simutrans.com", SYSCOL_TEXT_HIGHLIGHT, gui_label_t::left)->set_shadow(SYSCOL_TEXT_SHADOW, true);
-		new_component<gui_label_t>("http://wiki.simutrans.com", SYSCOL_TEXT_HIGHLIGHT, gui_label_t::left)->set_shadow(SYSCOL_TEXT_SHADOW, true);
+		new_component<gui_label_t>("https://www.simutrans.com", SYSCOL_TEXT_HIGHLIGHT, gui_label_t::left)->set_shadow(SYSCOL_TEXT_SHADOW, true);
+		new_component<gui_label_t>("https://forum.simutrans.com", SYSCOL_TEXT_HIGHLIGHT, gui_label_t::left)->set_shadow(SYSCOL_TEXT_SHADOW, true);
+		new_component<gui_label_t>("https://wiki.simutrans.com", SYSCOL_TEXT_HIGHLIGHT, gui_label_t::left)->set_shadow(SYSCOL_TEXT_SHADOW, true);
 		end_table();
 		new_component<gui_fill_t>();
 	}

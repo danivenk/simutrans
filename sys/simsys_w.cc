@@ -173,7 +173,7 @@ int dr_os_open(int const w, int const h, bool fullscreen)
 			if(  COLOUR_DEPTH<32  ) {
 				settings.dmBitsPerPel = 32;
 			}
-			printf( "dr_os_open()::Could not reduce color depth to 16 Bit in fullscreen." );
+			dbg->warning("dr_os_open(w32)", "Could not reduce color depth to 16 Bit in fullscreen." );
 		}
 		if(  ChangeDisplaySettings(&settings, CDS_TEST)!=DISP_CHANGE_SUCCESSFUL  ) {
 			ChangeDisplaySettings( NULL, 0 );
@@ -555,14 +555,14 @@ LRESULT WINAPI WindowProc(HWND this_hwnd, UINT msg, WPARAM wParam, LPARAM lParam
 				sys_event.type = SIM_SYSTEM;
 				sys_event.code = SYSTEM_RESIZE;
 
-				sys_event.new_window_size.w = (LOWORD(lParam)*32)/x_scale;
-				if (sys_event.new_window_size.w <= 0) {
-					sys_event.new_window_size.w = 4;
+				sys_event.new_window_size_w = (LOWORD(lParam)*32)/x_scale;
+				if (sys_event.new_window_size_w <= 0) {
+					sys_event.new_window_size_w = 4;
 				}
 
-				sys_event.new_window_size.h = (HIWORD(lParam)*32)/y_scale;
-				if (sys_event.new_window_size.h <= 1) {
-					sys_event.new_window_size.h = 64;
+				sys_event.new_window_size_h = (HIWORD(lParam)*32)/y_scale;
+				if (sys_event.new_window_size_h <= 1) {
+					sys_event.new_window_size_h = 64;
 				}
 			}
 			break;
@@ -853,8 +853,10 @@ LRESULT WINAPI WindowProc(HWND this_hwnd, UINT msg, WPARAM wParam, LPARAM lParam
 	if(  update_mouse  ) {
 		sys_event.key_mod = ModifierKeys();
 		sys_event.mb = last_mb = (wParam&3);
-		sys_event.mx      = (LOWORD(lParam) * 32)/x_scale;
-		sys_event.my      = (HIWORD(lParam) * 32)/y_scale;
+		sint16 x = LOWORD(lParam);
+		sys_event.mx      = (x * 32l)/x_scale;
+		sint16 y = HIWORD(lParam);
+		sys_event.my      = (y * 32l)/y_scale;
 	}
 
 
@@ -963,6 +965,14 @@ int main()
 	return WinMain(hInstance,NULL,NULL,NULL);
 }
 #endif
+
+
+const char* dr_get_locale()
+{
+	static char LanguageCode[5]="";
+	GetLocaleInfoA( GetUserDefaultUILanguage(), LOCALE_SISO639LANGNAME, LanguageCode, lengthof( LanguageCode ) );
+	return LanguageCode;
+}
 
 
 int CALLBACK WinMain(HINSTANCE const hInstance, HINSTANCE, LPSTR, int)

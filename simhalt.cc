@@ -277,23 +277,23 @@ void haltestelle_t::recalc_basis_pos()
 	koord cent;
 	cent = koord((sint16)(cent_x/level_sum),(sint16)(cent_y/level_sum));
 
+	// save old name
+	plainstring name = get_name();
+	// clear name at old place (and the book-keeping)
+	set_name(NULL);
+
 	if ( level_sum > 0 ) {
 		grund_t *new_center = get_ground_closest_to( cent );
 		if(  new_center != tiles.front().grund  &&  new_center->get_text()==NULL  ) {
-			// move the name to new center, if there is not yet a name on it
-			new_center->set_text( tiles.front().grund->get_text() );
-
-			// all_names contains pointers to ground-texts
-			// we need to adjust them
-			all_names.remove(tiles.front().grund->get_text());
-			all_names.set(new_center->get_text(), self);
-
-			tiles.front().grund->set_text(NULL);
+			// move to new center, if there is not yet a name on it
 			tiles.remove( new_center );
 			tiles.insert( new_center );
 			init_pos = new_center->get_pos().get_2d();
 		}
 	}
+	// .. and set name again (and do all the book-keeping)
+	set_name(name);
+
 	return;
 }
 
@@ -911,9 +911,7 @@ char* haltestelle_t::create_name(koord const k, char const* const typ)
 // add convoi to loading
 void haltestelle_t::request_loading( convoihandle_t cnv )
 {
-	if(  !loading_here.is_contained( cnv )  ) {
-		loading_here.append( cnv );
-	}
+	loading_here.append_unique( cnv );
 	if(  last_loading_step != welt->get_steps()  ) {
 		last_loading_step = welt->get_steps();
 		// now iterate over all convois
@@ -2334,8 +2332,7 @@ dbg->warning("haltestelle_t::liefere_an()","%d %s delivered to %s have no longer
 
 
 /**
- * @param buf the buffer to fill
- * @return Goods description text (buf)
+ * @param[out] buf Goods description text (buf)
  */
 void haltestelle_t::get_freight_info(cbuffer_t & buf)
 {
@@ -2919,48 +2916,52 @@ void haltestelle_t::finish_rd()
 		}
 	}
 
-	// what kind of station here?
-	recalc_station_type();
-
 	// handle name for old stations which don't exist in kartenboden
+	// also recover from stations without tiles (from broken savegames)
 	grund_t* bd = welt->lookup(get_basis_pos3d());
-	if(bd!=NULL  &&  !bd->get_flag(grund_t::has_text) ) {
-		// restore label and bridges
-		grund_t* bd_old = welt->lookup_kartenboden(get_basis_pos());
-		if(bd_old) {
-			// transfer name (if there)
-			const char *name = bd->get_text();
-			if(name) {
-				set_name( name );
-				bd_old->set_text( NULL );
-			}
-			else {
-				set_name( "Unknown" );
+	if(bd!=NULL) {
+
+		// what kind of station here?
+		recalc_station_type();
+
+		if(  !bd->get_flag(grund_t::has_text)  ) {
+			// restore label and bridges
+			grund_t* bd_old = welt->lookup_kartenboden(get_basis_pos());
+			if(bd_old) {
+				// transfer name (if there)
+				const char *name = bd->get_text();
+				if(name) {
+					set_name( name );
+					bd_old->set_text( NULL );
+				}
+				else {
+					set_name( "Unknown" );
+				}
 			}
 		}
-	}
-	else {
-		const char *current_name = bd->get_text();
-		if(  all_names.get(current_name).is_bound()  &&  fabrik_t::get_fab(get_basis_pos())==NULL  ) {
-			// try to get a new name ...
-			const char *new_name;
-			if(  station_type & airstop  ) {
-				new_name = create_name( get_basis_pos(), "Airport" );
+		else {
+			const char *current_name = bd->get_text();
+			if(  all_names.get(current_name).is_bound()  &&  fabrik_t::get_fab(get_basis_pos())==NULL  ) {
+				// try to get a new name ...
+				const char *new_name;
+				if(  station_type & airstop  ) {
+					new_name = create_name( get_basis_pos(), "Airport" );
+				}
+				else if(  station_type & dock  ) {
+					new_name = create_name( get_basis_pos(), "Dock" );
+				}
+				else if(  station_type & (railstation|monorailstop|maglevstop|narrowgaugestop)  ) {
+					new_name = create_name( get_basis_pos(), "BF" );
+				}
+				else {
+					new_name = create_name( get_basis_pos(), "H" );
+				}
+				dbg->warning("haltestelle_t::set_name()","name already used: \'%s\' -> \'%s\'", current_name, new_name );
+				bd->set_text( new_name );
+				current_name = new_name;
 			}
-			else if(  station_type & dock  ) {
-				new_name = create_name( get_basis_pos(), "Dock" );
-			}
-			else if(  station_type & (railstation|monorailstop|maglevstop|narrowgaugestop)  ) {
-				new_name = create_name( get_basis_pos(), "BF" );
-			}
-			else {
-				new_name = create_name( get_basis_pos(), "H" );
-			}
-			dbg->warning("haltestelle_t::set_name()","name already used: \'%s\' -> \'%s\'", current_name, new_name );
-			bd->set_text( new_name );
-			current_name = new_name;
+			all_names.set( current_name, self );
 		}
-		all_names.set( current_name, self );
 	}
 	recalc_status();
 	reconnect_counter = welt->get_schedule_counter()-1;
@@ -3056,7 +3057,7 @@ void haltestelle_t::recalc_status()
 /**
  * Draws some nice colored bars giving some status information
  */
-void haltestelle_t::display_status(KOORD_VAL xpos, KOORD_VAL ypos)
+void haltestelle_t::display_status(sint16 xpos, sint16 ypos)
 {
 	// ignore freight that cannot reach to this station
 	sint16 count = 0;
@@ -3070,13 +3071,13 @@ void haltestelle_t::display_status(KOORD_VAL xpos, KOORD_VAL ypos)
 	}
 	if(  count != last_bar_count  ) {
 		// bars will shift x positions, mark entire station bar region dirty
-		KOORD_VAL max_bar_height = 0;
+		scr_coord_val max_bar_height = 0;
 		for(  sint16 i = 0;  i < last_bar_count;  i++  ) {
 			if(  last_bar_height[i] > max_bar_height  ) {
 				max_bar_height = last_bar_height[i];
 			}
 		}
-		const KOORD_VAL x = xpos - (last_bar_count * D_WAITINGBAR_WIDTH - get_tile_raster_width()) / 2;
+		const scr_coord_val x = xpos - (last_bar_count * D_WAITINGBAR_WIDTH - get_tile_raster_width()) / 2;
 		mark_rect_dirty_wc( x - 1 - D_WAITINGBAR_WIDTH, ypos - 11 - max_bar_height - 6, x + last_bar_count * D_WAITINGBAR_WIDTH + 12 - 2, ypos - 11 );
 
 		// reset bar heights for new count
@@ -3090,7 +3091,7 @@ void haltestelle_t::display_status(KOORD_VAL xpos, KOORD_VAL ypos)
 
 	ypos -= D_LABEL_HEIGHT/2 +D_WAITINGBAR_WIDTH;
 	xpos -= (count * D_WAITINGBAR_WIDTH - get_tile_raster_width()) / 2;
-	const KOORD_VAL x = xpos;
+	const int x = xpos;
 
 	sint16 bar_height_index = 0;
 	uint32 max_capacity;
@@ -3126,8 +3127,8 @@ void haltestelle_t::display_status(KOORD_VAL xpos, KOORD_VAL ypos)
 				v += 5; // for marking dirty
 			}
 
-			if(  last_bar_height[bar_height_index] != (KOORD_VAL)v  ) {
-				if(  (KOORD_VAL)v > last_bar_height[bar_height_index]  ) {
+			if(  last_bar_height[bar_height_index] != (scr_coord_val)v  ) {
+				if(  (scr_coord_val)v > last_bar_height[bar_height_index]  ) {
 					// bar will be longer, mark new height dirty
 					mark_rect_dirty_wc( xpos, ypos - v - 1, xpos + D_WAITINGBAR_WIDTH, ypos - 1 );
 				}

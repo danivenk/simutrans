@@ -101,6 +101,9 @@ private:
 
 	uint16 station_coverage_size;
 
+	// convois depart even if not unloaded if the time is up
+	bool departures_on_time;
+
 	// the maximum length of each convoi
 	uint8 max_rail_convoi_length;
 	uint8 max_road_convoi_length;
@@ -157,7 +160,17 @@ private:
 	uint8 max_no_of_trees_on_square;
 	uint16 tree_climates;
 	uint16 no_tree_climates;
-	uint16 tree;
+
+public:
+	enum tree_distribution_t
+	{
+		TREE_DIST_NONE     = 0,
+		TREE_DIST_RANDOM   = 1,
+		TREE_DIST_RAINFALL = 2,
+		TREE_DIST_COUNT
+	};
+private:
+	uint16 tree_distribution;
 
 	sint8 lake_height; //relative to sea height
 
@@ -374,7 +387,16 @@ public:
 	void copy_city_road(settings_t const& other);
 
 	// init from this file ...
-	void parse_simuconf( tabfile_t &simuconf, sint16 &disp_width, sint16 &disp_height, sint16 &fullscreen, std::string &objfilename );
+	void parse_simuconf(tabfile_t& simuconf, sint16& disp_width, sint16& disp_height, bool& fullscreen, std::string& objfilename);
+
+	// init without screen parameters ...
+	void parse_simuconf(tabfile_t& simuconf) {
+		sint16 idummy = 0;
+		bool bdummy = false;
+		std::string sdummy;
+
+		parse_simuconf(simuconf, idummy, idummy, bdummy, sdummy);
+	}
 
 	void parse_colours(tabfile_t& simuconf);
 
@@ -409,7 +431,7 @@ public:
 	sint8 get_maximumheight() const { return world_maximum_height; }
 	sint8 get_minimumheight() const { return world_minimum_height; }
 
-	sint16 get_groundwater() const {return groundwater;}
+	sint8 get_groundwater() const {return (sint8)groundwater;}
 
 	double get_max_mountain_height() const {return max_mountain_height;}
 
@@ -572,11 +594,11 @@ public:
 	uint8 get_max_no_of_trees_on_square() const { return max_no_of_trees_on_square; }
 	uint16 get_tree_climates() const { return tree_climates; }
 	uint16 get_no_tree_climates() const { return no_tree_climates; }
-	uint16 get_tree() const { return tree; }
-	void set_tree(uint16 i) { tree = i; }
+	tree_distribution_t get_tree_distribution() const { return (tree_distribution_t)tree_distribution; }
+	void set_tree_distribution(tree_distribution_t value) { tree_distribution = value; }
 
 	void set_default_climates();
-	sint8 get_climate_borders( sint8 climate, sint8 start_end ) const { return climate_borders[climate][start_end]; }
+	sint8 get_climate_borders( sint8 climate, sint8 start_end ) const { return (sint8)climate_borders[climate][start_end]; }
 
 	sint8 get_tropic_humidity() const { return tropic_humidity; }
 	sint8 get_desert_humidity() const { return desert_humidity; }
@@ -634,6 +656,9 @@ public:
 
 	uint32 get_default_ai_construction_speed() const { return default_ai_construction_speed; }
 	void set_default_ai_construction_speed( uint32 n ) { default_ai_construction_speed = n; }
+
+	bool get_departures_on_time() const { return departures_on_time; }
+	void set_departures_on_time(bool b) { departures_on_time = b; }
 };
 
 #endif

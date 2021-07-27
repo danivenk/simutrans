@@ -37,7 +37,6 @@ void schedule_t::copy_from(const schedule_t *src)
 	// make sure, we can access both
 	if(  src==NULL  ) {
 		dbg->fatal("schedule_t::copy_to()","cannot copy from NULL");
-		return;
 	}
 	entries.clear();
 	FOR(minivec_tpl<schedule_entry_t>, const& i, src->entries) {
@@ -114,47 +113,29 @@ halthandle_t schedule_t::get_prev_halt( player_t *player ) const
 }
 
 
-bool schedule_t::insert(const grund_t* gr, uint8 minimum_loading, uint8 waiting_time_shift )
+bool schedule_t::insert(const grund_t* gr, uint8 minimum_loading, uint16 waiting_time )
 {
-	// stored in minivec, so we have to avoid adding too many
-	if(  entries.get_count()>=254  ) {
-		create_win( new news_img("Maximum 254 stops\nin a schedule!\n"), w_time_delete, magic_none);
+	// too many stops or wrong kind of stop
+	if (entries.get_count()>=254  ||  !is_stop_allowed(gr)) {
 		return false;
 	}
 
-	if(  is_stop_allowed(gr)  ) {
-		entries.insert_at(current_stop, schedule_entry_t(gr->get_pos(), minimum_loading, waiting_time_shift));
-		current_stop ++;
-		make_current_stop_valid();
-		return true;
-	}
-	else {
-		// too many stops or wrong kind of stop
-		create_win( new news_img(get_error_msg()), w_time_delete, magic_none);
-		return false;
-	}
+	entries.insert_at(current_stop, schedule_entry_t(gr->get_pos(), minimum_loading, waiting_time));
+	current_stop ++;
+	make_current_stop_valid();
+	return true;
 }
 
 
 
-bool schedule_t::append(const grund_t* gr, uint8 minimum_loading, uint8 waiting_time_shift)
+bool schedule_t::append(const grund_t* gr, uint8 minimum_loading, uint16 waiting_time)
 {
-	// stored in minivec, so we have to avoid adding too many
-	if(entries.get_count()>=254) {
-		create_win( new news_img("Maximum 254 stops\nin a schedule!\n"), w_time_delete, magic_none);
+	// too many stops or wrong kind of stop
+	if (entries.get_count()>=254  ||  !is_stop_allowed(gr)) {
 		return false;
 	}
-
-	if(is_stop_allowed(gr)) {
-		entries.append(schedule_entry_t(gr->get_pos(), minimum_loading, waiting_time_shift), 4);
-		return true;
-	}
-	else {
-		DBG_MESSAGE("schedule_t::append()","forbidden stop at %i,%i,%i",gr->get_pos().x, gr->get_pos().x, gr->get_pos().z );
-		// error
-		create_win( new news_img(get_error_msg()), w_time_delete, magic_none);
-		return false;
-	}
+	entries.append(schedule_entry_t(gr->get_pos(), minimum_loading, waiting_time), 4);
+	return true;
 }
 
 
@@ -302,7 +283,6 @@ void schedule_t::move_entry_backward( uint8 cur )
 	}
 
 	sint16 delta = (new_cur - (sint16)cur);
-	;
 
 	if(  new_cur+1 > entries.get_count()  ||  new_cur == 0  ) {
 		// insert at front
@@ -624,7 +604,7 @@ bool schedule_t::sscanf_schedule( const char *ptr )
 			p++;
 		}
 		// ok, now we have a complete entry
-		entries.append(schedule_entry_t(koord3d(values[0], values[1], values[2]), values[3], values[4]));
+		entries.append(schedule_entry_t(koord3d(values[0], values[1], (sint8)values[2]), (uint8)values[3], (uint16)values[4]));
 	}
 	return true;
 }

@@ -45,12 +45,9 @@
 
 #include "minimap.h"
 
-static uint8 tabs_to_lineindex[9];
-static uint8 max_idx=0;
-
-#define MAX_SORT_IDX (4)
-static uint8 idx_to_sort_mode[MAX_SORT_IDX] = { line_scrollitem_t::SORT_BY_NAME, line_scrollitem_t::SORT_BY_PROFIT, line_scrollitem_t::SORT_BY_TRANSPORTED, line_scrollitem_t::SORT_BY_CONVOIS };
-static const char *idx_to_sort_text[MAX_SORT_IDX] = { "Name", "Revenue", "Transported", "Number of convois" };
+#define MAX_SORT_IDX (5)
+static uint8 idx_to_sort_mode[MAX_SORT_IDX] = { line_scrollitem_t::SORT_BY_NAME, line_scrollitem_t::SORT_BY_PROFIT, line_scrollitem_t::SORT_BY_REVENUE, line_scrollitem_t::SORT_BY_TRANSPORTED, line_scrollitem_t::SORT_BY_CONVOIS };
+static const char *idx_to_sort_text[MAX_SORT_IDX] = { "Name", "Profit", "Revenue", "Transported", "Number of convois" };
 
 /// selected tab per player
 static uint8 selected_tab[MAX_PLAYER_COUNT] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
@@ -66,22 +63,58 @@ schedule_list_gui_t::schedule_list_gui_t(player_t *player_) :
 	schedule_filter[0] = 0;
 	old_schedule_filter[0] = 0;
 	current_sort_mode = 0;
+	line_scrollitem_t::sort_reverse = false;
 
 	// add components
 	// first column: scrolled list of all lines
 
 	set_table_layout(1,0);
 
-	add_table(2,0);
+	add_table(4,0);
 	{
 		// below line list: line filter
-		new_component<gui_label_t>( "Line Filter");
-
+		new_component<gui_label_t>("Filter:");
 		inp_filter.set_text( schedule_filter, lengthof( schedule_filter ) );
 		inp_filter.add_listener( this );
-		add_component( &inp_filter );
+		add_component( &inp_filter, 2 );
+		new_component<gui_fill_t>();
+
+		// freight type filter
+		new_component<gui_empty_t>();
+		viewable_freight_types.append(NULL);
+		freight_type_c.new_component<gui_scrolled_list_t::const_text_scrollitem_t>(translator::translate("All"), SYSCOL_TEXT);
+		viewable_freight_types.append(goods_manager_t::passengers);
+		freight_type_c.new_component<gui_scrolled_list_t::const_text_scrollitem_t>(translator::translate("Passagiere"), SYSCOL_TEXT);
+		viewable_freight_types.append(goods_manager_t::mail);
+		freight_type_c.new_component<gui_scrolled_list_t::const_text_scrollitem_t>(translator::translate("Post"), SYSCOL_TEXT);
+		viewable_freight_types.append(goods_manager_t::none); // for all freight ...
+		freight_type_c.new_component<gui_scrolled_list_t::const_text_scrollitem_t>(translator::translate("Fracht"), SYSCOL_TEXT);
+		for (int i = 0; i < goods_manager_t::get_max_catg_index(); i++) {
+			const goods_desc_t* freight_type = goods_manager_t::get_info_catg(i);
+			const int index = freight_type->get_catg_index();
+			if (index == goods_manager_t::INDEX_NONE || freight_type->get_catg() == 0) {
+				continue;
+			}
+			freight_type_c.new_component<gui_scrolled_list_t::const_text_scrollitem_t>(translator::translate(freight_type->get_catg_name()), SYSCOL_TEXT);
+			viewable_freight_types.append(freight_type);
+		}
+		for (int i = 0; i < goods_manager_t::get_count(); i++) {
+			const goods_desc_t* ware = goods_manager_t::get_info(i);
+			if (ware->get_catg() == 0 && ware->get_index() > 2) {
+				// Special freight: Each good is special
+				viewable_freight_types.append(ware);
+				freight_type_c.new_component<gui_scrolled_list_t::const_text_scrollitem_t>(translator::translate(ware->get_name()), SYSCOL_TEXT);
+			}
+		}
+		freight_type_c.set_selection(0);
+		freight_type_c.set_focusable(true);
+		freight_type_c.add_listener(this);
+		add_component(&freight_type_c, 2);
+		new_component<gui_fill_t>();
+
 
 		// sort by what
+		new_component<gui_label_t>("hl_txt_sort");
 		for( int i=0; i<MAX_SORT_IDX;  i++ ) {
 			sort_type_c.new_component<gui_scrolled_list_t::const_text_scrollitem_t>( translator::translate(idx_to_sort_text[i]), SYSCOL_TEXT) ;
 		}
@@ -90,40 +123,31 @@ schedule_list_gui_t::schedule_list_gui_t(player_t *player_) :
 		sort_type_c.add_listener( this );
 		add_component(&sort_type_c);
 
-		// freight type filter
-		viewable_freight_types.append(NULL);
-		freight_type_c.new_component<gui_scrolled_list_t::const_text_scrollitem_t>( translator::translate("All"), SYSCOL_TEXT) ;
-		viewable_freight_types.append(goods_manager_t::passengers);
-		freight_type_c.new_component<gui_scrolled_list_t::const_text_scrollitem_t>( translator::translate("Passagiere"), SYSCOL_TEXT) ;
-		viewable_freight_types.append(goods_manager_t::mail);
-		freight_type_c.new_component<gui_scrolled_list_t::const_text_scrollitem_t>( translator::translate("Post"), SYSCOL_TEXT) ;
-		viewable_freight_types.append(goods_manager_t::none); // for all freight ...
-		freight_type_c.new_component<gui_scrolled_list_t::const_text_scrollitem_t>( translator::translate("Fracht"), SYSCOL_TEXT) ;
-		for(  int i = 0;  i < goods_manager_t::get_max_catg_index();  i++  ) {
-			const goods_desc_t *freight_type = goods_manager_t::get_info_catg(i);
-			const int index = freight_type->get_catg_index();
-			if(  index == goods_manager_t::INDEX_NONE  ||  freight_type->get_catg()==0  ) {
-				continue;
-			}
-			freight_type_c.new_component<gui_scrolled_list_t::const_text_scrollitem_t>(translator::translate(freight_type->get_catg_name()), SYSCOL_TEXT);
-			viewable_freight_types.append(freight_type);
-		}
-		for(  int i=0;  i < goods_manager_t::get_count();  i++  ) {
-			const goods_desc_t *ware = goods_manager_t::get_info(i);
-			if(  ware->get_catg() == 0  &&  ware->get_index() > 2  ) {
-				// Special freight: Each good is special
-				viewable_freight_types.append(ware);
-				freight_type_c.new_component<gui_scrolled_list_t::const_text_scrollitem_t>( translator::translate(ware->get_name()), SYSCOL_TEXT) ;
-			}
-		}
-		freight_type_c.set_selection(0);
-		freight_type_c.set_focusable( true );
-		freight_type_c.add_listener( this );
-		add_component(&freight_type_c);
+		sorteddir.init(button_t::sortarrow_state, NULL);
+		sorteddir.add_listener(this);
+		sorteddir.pressed = line_scrollitem_t::sort_reverse;
+		add_component(&sorteddir);
 
-		bt_new_line.init( button_t::roundbox, "New Line" );
+		new_component<gui_fill_t>();
+
+		// line control buttons
+		bt_new_line.init(button_t::roundbox, "New Line");
 		bt_new_line.add_listener(this);
-		add_component(&bt_new_line,2);
+		add_component(&bt_new_line);
+
+		bt_delete_line.init(button_t::roundbox, "Delete Line");
+		bt_delete_line.set_tooltip("Delete the selected line (if without associated convois).");
+		bt_delete_line.add_listener(this);
+		add_component( &bt_delete_line );
+
+		bt_single_line.init( button_t::square_automatic, "Single GUI" );
+		bt_single_line.set_tooltip( "Closes topmost line window when new line selected." );
+		bt_single_line.add_listener( this );
+		bt_single_line.pressed = env_t::single_line_gui;
+		add_component( &bt_single_line );
+
+		new_component<gui_fill_t>();
+
 	}
 	end_table();
 
@@ -131,58 +155,14 @@ schedule_list_gui_t::schedule_list_gui_t(player_t *player_) :
 	scl.add_listener(this);
 
 	// tab panel
-	tabs.add_tab(&scl, translator::translate("All"));
-	max_idx = 0;
-	tabs_to_lineindex[max_idx++] = simline_t::line;
-
-	// now add all specific tabs
-	if(  maglev_t::default_maglev  ) {
-		tabs.add_tab(&scl, translator::translate("Maglev"), skinverwaltung_t::maglevhaltsymbol, translator::translate("Maglev"));
-		tabs_to_lineindex[max_idx++] = simline_t::maglevline;
-	}
-	if(  monorail_t::default_monorail  ) {
-		tabs.add_tab(&scl, translator::translate("Monorail"), skinverwaltung_t::monorailhaltsymbol, translator::translate("Monorail"));
-		tabs_to_lineindex[max_idx++] = simline_t::monorailline;
-	}
-	if(  schiene_t::default_schiene  ) {
-		tabs.add_tab(&scl, translator::translate("Train"), skinverwaltung_t::zughaltsymbol, translator::translate("Train"));
-		tabs_to_lineindex[max_idx++] = simline_t::trainline;
-	}
-	if(  narrowgauge_t::default_narrowgauge  ) {
-		tabs.add_tab(&scl, translator::translate("Narrowgauge"), skinverwaltung_t::narrowgaugehaltsymbol, translator::translate("Narrowgauge"));
-		tabs_to_lineindex[max_idx++] = simline_t::narrowgaugeline;
-	}
-	if(  !vehicle_builder_t::get_info(tram_wt).empty()  ) {
-		tabs.add_tab(&scl, translator::translate("Tram"), skinverwaltung_t::tramhaltsymbol, translator::translate("Tram"));
-		tabs_to_lineindex[max_idx++] = simline_t::tramline;
-	}
-	if(  strasse_t::default_strasse) {
-		tabs.add_tab(&scl, translator::translate("Truck"), skinverwaltung_t::autohaltsymbol, translator::translate("Truck"));
-		tabs_to_lineindex[max_idx++] = simline_t::truckline;
-	}
-	if(  !vehicle_builder_t::get_info(water_wt).empty()  ) {
-		tabs.add_tab(&scl, translator::translate("Ship"), skinverwaltung_t::schiffshaltsymbol, translator::translate("Ship"));
-		tabs_to_lineindex[max_idx++] = simline_t::shipline;
-	}
-	if(  runway_t::default_runway  ) {
-		tabs.add_tab(&scl, translator::translate("Air"), skinverwaltung_t::airhaltsymbol, translator::translate("Air"));
-		tabs_to_lineindex[max_idx++] = simline_t::airline;
-	}
+	tabs.init_tabs(&scl);
 	tabs.add_listener(this);
 	add_component(&tabs);
 
 	// recover last selected line
-	int index = 0;
-	for(  uint i=0;  i<max_idx;  i++  ) {
-		if(  tabs_to_lineindex[i] == selected_tab[player->get_player_nr()]  ) {
-			index = i;
-			break;
-		}
-	}
-	selected_tab[player->get_player_nr()] = tabs_to_lineindex[index]; // reset if previous selected tab is not there anymore
-	tabs.set_active_tab_index(index);
+	tabs.set_active_tab_waytype(simline_t::linetype_to_waytype((simline_t::linetype)selected_tab[player->get_player_nr()]));
 
-	build_line_list(index);
+	build_line_list((simline_t::linetype)selected_tab[player->get_player_nr()]);
 
 	set_resizemode(diagonal_resize);
 	reset_min_windowsize();
@@ -193,11 +173,11 @@ bool schedule_list_gui_t::action_triggered( gui_action_creator_t *comp, value_t 
 {
 	if(  comp == &bt_new_line  ) {
 		// create typed line
-		assert(  tabs.get_active_tab_index() > 0  &&  tabs.get_active_tab_index()<max_idx  );
+		assert(  tabs.get_active_tab_index() > 0  );
 		// update line schedule via tool!
 		tool_t *tmp_tool = create_tool( TOOL_CHANGE_LINE | SIMPLE_TOOL );
 		cbuffer_t buf;
-		int type = tabs_to_lineindex[tabs.get_active_tab_index()];
+		int type = simline_t::waytype_to_linetype(tabs.get_active_tab_waytype());
 		buf.printf( "c,0,%i,0,0|%i|", type, type );
 		tmp_tool->set_default_param(buf);
 		welt->set_tool( tmp_tool, player );
@@ -205,16 +185,37 @@ bool schedule_list_gui_t::action_triggered( gui_action_creator_t *comp, value_t 
 		delete tmp_tool;
 		depot_t::update_all_win();
 	}
+	else if(  comp == &bt_delete_line  ) {
+		vector_tpl<sint32> sel = scl.get_selections();
+		FOR(vector_tpl<sint32>, i, sel) {
+			linehandle_t line = ((line_scrollitem_t*)scl.get_element(i))->get_line();
+			if (line->count_convoys()==0) {
+				// delete this line via tool
+				tool_t* tmp_tool = create_tool(TOOL_CHANGE_LINE | SIMPLE_TOOL);
+				cbuffer_t buf;
+				buf.printf("d,%i", line.get_id());
+				tmp_tool->set_default_param(buf);
+				welt->set_tool(tmp_tool, player);
+				// since init always returns false, it is safe to delete immediately
+				delete tmp_tool;
+			}
+		}
+		depot_t::update_all_win();
+	}
+	else if(  comp == &bt_single_line  ) {
+		env_t::single_line_gui ^= 1;
+		bt_single_line.pressed = env_t::single_line_gui;
+	}
 	else if(  comp == &tabs  ) {
 		int const tab = tabs.get_active_tab_index();
 		uint8 old_selected_tab = selected_tab[player->get_player_nr()];
-		selected_tab[player->get_player_nr()] = tabs_to_lineindex[tab];
+		selected_tab[player->get_player_nr()] = simline_t::waytype_to_linetype(tabs.get_active_tab_waytype());
 		if(  old_selected_tab == simline_t::line  &&  selected_line[player->get_player_nr()][0].is_bound()  &&
 			selected_line[player->get_player_nr()][0]->get_linetype() == selected_tab[player->get_player_nr()]  ) {
 				// switching from general to same waytype tab while line is seletced => use current line instead
 				selected_line[player->get_player_nr()][selected_tab[player->get_player_nr()]] = selected_line[player->get_player_nr()][0];
 		}
-		build_line_list(tab);
+		build_line_list((simline_t::linetype)selected_tab[player->get_player_nr()]);
 		if(  tab>0  ) {
 			bt_new_line.enable();
 		}
@@ -237,26 +238,40 @@ bool schedule_list_gui_t::action_triggered( gui_action_creator_t *comp, value_t 
 			if(  line_info  ) {
 				// close if open
 				destroy_win( line_info );
-//				top_win( line_info );
-//				win_set_pos( line_info, lc.x, lc.y );
 			}
 			else {
-				create_win( lc.x, lc.y, new line_management_gui_t(line, player), w_info, (ptrdiff_t)line.get_rep() );
+				if( bt_single_line.pressed  &&  win_get_open_count()>=2 ) {
+					// close second topmost line window
+					for( int i = win_get_open_count()-1; i>=0; i-- ) {
+						if( gui_frame_t* gui = win_get_index( i ) ) {
+							if( gui->get_rdwr_id()==magic_line_schedule_rdwr_dummy ) {
+								destroy_win( gui );
+								break;
+							}
+						}
+					}
+				}
+				create_win( lc.x, lc.y, new line_management_gui_t(line, player, -1), w_info, (ptrdiff_t)line.get_rep(), true );
 			}
 		}
 		scl.set_selection( -1 );
 	}
 	else if(  comp == &inp_filter  ) {
 		if(  strcmp(old_schedule_filter,schedule_filter)  ) {
-			build_line_list(tabs.get_active_tab_index());
+			build_line_list(simline_t::waytype_to_linetype(tabs.get_active_tab_waytype()));
 			strcpy(old_schedule_filter,schedule_filter);
 		}
 	}
 	else if(  comp == &freight_type_c  ) {
-		build_line_list(tabs.get_active_tab_index());
+		build_line_list(simline_t::waytype_to_linetype(tabs.get_active_tab_waytype()));
+	}
+	else if (comp == &sorteddir) {
+		line_scrollitem_t::sort_reverse = !line_scrollitem_t::sort_reverse;
+		sorteddir.pressed = line_scrollitem_t::sort_reverse;
+		build_line_list(simline_t::waytype_to_linetype(tabs.get_active_tab_waytype()));
 	}
 	else if(  comp == &sort_type_c  ) {
-		build_line_list(tabs.get_active_tab_index());
+		build_line_list(simline_t::waytype_to_linetype(tabs.get_active_tab_waytype()));
 	}
 
 	return true;
@@ -268,25 +283,40 @@ void schedule_list_gui_t::draw(scr_coord pos, scr_size size)
 	// deativate buttons, if not curretn player
 	const bool activate = player == welt->get_active_player()  ||   welt->get_active_player()==welt->get_player( 1 );
 	bt_new_line.enable( activate  &&  tabs.get_active_tab_index() > 0);
+	bt_delete_line.enable(activate);
 
 	// if search string changed, update line selection
 	if(  old_line_count != player->simlinemgmt.get_line_count()  ||  strcmp( old_schedule_filter, schedule_filter )  ) {
 		old_line_count = player->simlinemgmt.get_line_count();
-		build_line_list(tabs.get_active_tab_index());
+		build_line_list(simline_t::waytype_to_linetype(tabs.get_active_tab_waytype()));
 		strcpy( old_schedule_filter, schedule_filter );
 	}
+
+	vector_tpl<sint32> sel = scl.get_selections();
+	bool can_delete = sel.get_count() > 0  &&  activate;
+	if (can_delete) {
+		FOR(vector_tpl<sint32>, i, sel) {
+			linehandle_t line = ((line_scrollitem_t*)scl.get_element(i))->get_line();
+			if (line->count_convoys() > 0) {
+				can_delete = false;
+				break;
+			}
+		}
+
+	}
+	bt_delete_line.enable(can_delete);
 
 	gui_frame_t::draw(pos, size);
 }
 
 
-void schedule_list_gui_t::build_line_list(int filter)
+void schedule_list_gui_t::build_line_list(simline_t::linetype filter)
 {
 	vector_tpl<linehandle_t>lines;
 
 	sint32 sel = -1;
 	scl.clear_elements();
-	player->simlinemgmt.get_lines(tabs_to_lineindex[filter], &lines);
+	player->simlinemgmt.get_lines(filter, &lines);
 
 	FOR(vector_tpl<linehandle_t>, const l, lines) {
 		// search name
@@ -320,24 +350,26 @@ uint32 schedule_list_gui_t::get_rdwr_id()
 void schedule_list_gui_t::rdwr( loadsave_t *file )
 {
 	scr_size size;
-	sint32 cont_xoff, cont_yoff;
 	if(  file->is_saving()  ) {
 		size = get_windowsize();
-		cont_xoff = scl.get_scroll_x();
-		cont_yoff = scl.get_scroll_y();
 	}
 	size.rdwr( file );
 	tabs.rdwr( file );
 	simline_t::rdwr_linehandle_t(file, line);
+	scl.rdwr(file);
+	sort_type_c.rdwr(file);
+	freight_type_c.rdwr(file);
+	file->rdwr_str(schedule_filter, lengthof(schedule_filter));
+	file->rdwr_bool(line_scrollitem_t::sort_reverse);
 
-	file->rdwr_long( cont_xoff );
-	file->rdwr_long( cont_yoff );
 	// open dialogue
 	if(  file->is_loading()  ) {
-		set_windowsize( size );
-		build_line_list(tabs.get_active_tab_index());
-		resize( scr_coord(0,0) );
-		scl.set_scroll_position( cont_xoff, cont_yoff );
+		current_sort_mode = idx_to_sort_mode[sort_type_c.get_selection()];
+		line_scrollitem_t::sort_mode = (line_scrollitem_t::sort_modes_t)current_sort_mode;
+		build_line_list(simline_t::waytype_to_linetype(tabs.get_active_tab_waytype()));
+		set_windowsize(size);
+		// that would be the proper way to restore windows, would keep the simwin side cleaner) ...
+//		win_set_magic(magic_line_management_t + player->get_player_nr())
 	}
 }
 

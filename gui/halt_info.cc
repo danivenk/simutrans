@@ -104,7 +104,7 @@ class gui_halt_detail_t : public gui_aligned_container_t
 		{
 			player_t *player = welt->get_active_player();
 			if(  player == line->get_owner()  ) {
-				player->simlinemgmt.show_lineinfo(player, line);
+				player->simlinemgmt.show_lineinfo(player, line, 3);
 			}
 			return true;
 		}
@@ -760,12 +760,32 @@ void gui_departure_board_t::update_departures(halthandle_t halt)
 
 	// iterate over all convoys stopping here
 	FOR(  slist_tpl<convoihandle_t>, cnv, halt->get_loading_convois() ) {
-		if( !cnv.is_bound()) {
+		if( !cnv.is_bound()  ||  cnv->get_state()!=convoi_t::LOADING  ) {
 			continue;
 		}
 		halthandle_t next_halt = cnv->get_schedule()->get_next_halt(cnv->get_owner(),halt);
 		if(  next_halt.is_bound()  ) {
-			dest_info_t next( next_halt, 0, cnv );
+
+			uint32 delta_ticks = 0;
+			if(  cnv->get_schedule()->get_current_entry().waiting_time > 0  ) {
+				if(  cnv->get_schedule()->get_current_entry().minimum_loading == 0  ) {
+					// absolute schedule
+					delta_ticks = cnv->get_departure_ticks();
+				}
+				else {
+					// waiting for load with max time
+					delta_ticks = cnv->get_arrival_ticks() + cnv->get_schedule()->get_current_entry().get_waiting_ticks();
+				}
+				// avoid overflow when departure time has passed but convoi si still loading etc.
+				uint32 ct = welt->get_ticks();
+				if (ct > delta_ticks) {
+					delta_ticks = 0;
+				}
+				else {
+					delta_ticks -= ct;
+				}
+			}
+			dest_info_t next( next_halt, delta_ticks, cnv );
 			destinations.append_unique( next );
 			if(  grund_t *gr = welt->lookup( cnv->get_vehikel(0)->last_stop_pos )  ) {
 				if(  gr->get_halt().is_bound()  &&  gr->get_halt() != halt  ) {

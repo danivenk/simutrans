@@ -26,8 +26,8 @@
 #include "../pathes.h"
 #include "../simevent.h"
 #include "../utils/simstring.h"
+#include "../simdebug.h"
 #include "../simevent.h"
-
 
 #ifdef _WIN32
 #	include <locale>
@@ -141,7 +141,7 @@ int get_mouse_y()
 uint8 dr_get_max_threads()
 {
 	uint8 max_threads = 0;
-#ifdef MULTITHREAD
+#ifdef MULTI_THREAD
 #if 0
 	// does not work when crosscompile with mingw!
 	max_threads = std::thread::hardware_concurrency();
@@ -961,7 +961,7 @@ const char *dr_get_locale_string()
 	}
 	return NULL;
 }
-#elif __HAIKU__
+#elif defined(__HAIKU__) && __HAIKU__
 #include <Message.h>
 #include <LocaleRoster.h>
 
@@ -1047,9 +1047,10 @@ bool dr_download_pakset( const char *data_dir, bool portable )
 	(void)portable;
 
 	char command[2048];
-	chdir( data_dir );
+	dr_chdir( data_dir );
 	sprintf(command, "%s/get_pak.sh", data_dir);
-	system( command );
+	const int retval = system( command );
+	dbg->debug("dr_download_pakset", "Command '%s' returned %d", command, retval);
 	return true;
 #endif
 }

@@ -5,8 +5,8 @@
 
 # Define variables here to force them as simple flavor. -> Faster parallel builds.
 FLAGS :=
-CFLAGS :=
-LDFLAGS :=
+CFLAGS ?=
+LDFLAGS ?=
 LIBS :=
 SOURCES :=
 STATIC := 0
@@ -76,6 +76,8 @@ else ifeq ($(OSTYPE),mingw)
   else
     LDFLAGS += -mwindows
   endif
+else ifeq ($(OSTYPE),linux)
+  LD_FLAGS += "-Wl,-Bstatic"
 endif
 
 ifeq ($(BACKEND),sdl2)
@@ -99,6 +101,11 @@ ifdef OPTIMISE
   endif
 else
   CFLAGS += -O1
+endif
+
+ifneq ($(LTO),)
+  CFLAGS += -flto
+  LDFLAGS += -flto
 endif
 
 ifdef DEBUG
@@ -239,10 +246,15 @@ ifdef WITH_REVISION
          $(info Revision is $(REV))
       endif
     endif
+  endif
+endif
 
-    ifneq ($(REV),)
-      CFLAGS  += -DREVISION=$(REV)
-    endif
+ifneq ($(REV),)
+  CFLAGS  += -DREVISION=$(REV)
+  DUMMY := $(shell rm -f revision.h)
+else
+  ifeq ("$(wildcard revision.h)","")
+    DUMMY := $(shell echo '\#define REVISION' > revision.h)
   endif
 endif
 
@@ -635,7 +647,9 @@ ifeq ($(BACKEND),sdl)
   else
     SOURCES   += sound/sdl_sound.cc
     ifneq ($(OSTYPE),mingw)
-      SOURCES += music/no_midi.cc
+      ifeq ($(USE_FLUIDSYNTH_MIDI), 0)
+        SOURCES += music/no_midi.cc
+      endif
     else
       SOURCES += music/w32_midi.cc
     endif
@@ -760,7 +774,11 @@ CFLAGS += -DCOLOUR_DEPTH=$(COLOUR_DEPTH)
 
 ifeq ($(OSTYPE),mingw)
   SOURCES += simres.rc
-  WINDRES ?= windres
+  ifneq ($(REV),)
+    WINDRES ?= windres -DREVISION=$(REV)
+  else
+    WINDRES ?= windres -DREVISION
+  endif
 endif
 
 CCFLAGS  += $(CFLAGS)
