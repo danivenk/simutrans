@@ -20,7 +20,7 @@ class plainstring;
 
 /**
  * This class replaces the FILE when loading and saving games.
- * </p>
+ *
  * Can now read and write 3 formats: text, binary and zipped
  * Input format is automatically detected.
  * Output format has a default, changeable with set_savemode, but can be
@@ -29,6 +29,9 @@ class plainstring;
 class loadsave_t
 {
 private:
+	// during reading, a fatal error will rename the file to "oldnam"-error, so one can try again
+	void NORETURN fatal(const char* who, const char* format, ...);
+
 	struct buf_t
 	{
 		size_t pos;
@@ -64,8 +67,9 @@ protected:
 	unsigned curr_buff;
 	buf_t buff[2];
 
-	int ident;              // only for XML formatting
+	int indent;              // only for XML formatting
 	file_info_t finfo;
+	std::string filename;
 
 	rdwr_stream_t *stream;
 
@@ -75,8 +79,9 @@ protected:
 	/// @sa getc
 	inline int lsgetc();
 
-	size_t write(const void * buf, size_t len);
 	size_t read(void *buf, size_t len);
+	size_t write(const void *buf, size_t len);
+	void write_indent();
 
 	void rdwr_xml_number(sint64 &s, const char *typ);
 

@@ -5,6 +5,7 @@
 
 #include "vehicle.h"
 
+#include "../simintr.h"
 #include "../simworld.h"
 #include "../simware.h"
 #include "../simconvoi.h"
@@ -66,7 +67,7 @@ void vehicle_t::set_convoi(convoi_t *c)
 			if (!r.empty() && route_index < r.get_count() - 1) {
 				grund_t const* const gr = welt->lookup(pos_next);
 				if (!gr || !gr->get_weg(get_waytype())) {
-					if (!(water_wt == get_waytype()  &&  gr->is_water())) { // ships on the open sea are valid
+					if (!(water_wt == get_waytype()  &&  gr  &&  gr->is_water())) { // ships on the open sea are valid
 						pos_next = r.at(route_index + 1U);
 					}
 				}
@@ -84,7 +85,7 @@ void vehicle_t::set_convoi(convoi_t *c)
  * Unload freight to halt
  * @return sum of unloaded goods
  */
-uint16 vehicle_t::unload_cargo(halthandle_t halt, bool unload_all )
+uint16 vehicle_t::unload_cargo(halthandle_t halt, bool unload_all, uint16 max_amount )
 {
 	uint16 sum_menge = 0, sum_delivered = 0, index = 0;
 	if(  !halt.is_bound()  ) {
@@ -94,8 +95,8 @@ uint16 vehicle_t::unload_cargo(halthandle_t halt, bool unload_all )
 	if(  halt->is_enabled( get_cargo_type() )  ) {
 		if(  !fracht.empty()  ) {
 
-			for(  slist_tpl<ware_t>::iterator i = fracht.begin(), end = fracht.end();  i != end;  ) {
-				const ware_t& tmp = *i;
+			for(  slist_tpl<ware_t>::iterator i = fracht.begin(), end = fracht.end();  i != end  &&  max_amount > 0;  ) {
+				ware_t& tmp = *i;
 
 				halthandle_t end_halt = tmp.get_ziel();
 				halthandle_t via_halt = tmp.get_zwischenziel();
@@ -109,17 +110,16 @@ uint16 vehicle_t::unload_cargo(halthandle_t halt, bool unload_all )
 					sum_weight -= tmp.menge * tmp.get_desc()->get_weight_per_unit();
 					i = fracht.erase( i );
 				}
-				else if(  end_halt == halt || via_halt == halt  ||  unload_all  ) {
-
-//					printf("Liefere %d %s nach %s via %s an %s\n",
-//						tmp->menge,
-//						tmp->name(),
-//						end_halt->get_name(),
-//						via_halt->get_name(),
-//						halt->get_name());
+				else if(  end_halt == halt  ||  via_halt == halt  ||  unload_all  ) {
 
 					// here, only ordinary goods should be processed
-					int menge = halt->liefere_an(tmp);
+					uint32 org_menge = tmp.menge;
+					if (tmp.menge > max_amount) {
+						tmp.menge = max_amount;
+					}
+					// since the max capacity of a vehicle is an uint16
+					uint16 menge = (uint16)halt->liefere_an(tmp);
+					max_amount -= menge;
 					sum_menge += menge;
 					total_freight -= menge;
 					sum_weight -= tmp.menge * tmp.get_desc()->get_weight_per_unit();
@@ -130,7 +130,11 @@ uint16 vehicle_t::unload_cargo(halthandle_t halt, bool unload_all )
 						sum_delivered += menge;
 					}
 
-					i = fracht.erase( i );
+					// in case of partial unlaoding
+					tmp.menge = org_menge-tmp.menge;
+					if (tmp.menge == 0) {
+						i = fracht.erase(i);
+					}
 				}
 				else {
 					++i;
@@ -162,14 +166,14 @@ uint16 vehicle_t::unload_cargo(halthandle_t halt, bool unload_all )
  * Load freight from halt
  * @return amount loaded
  */
-uint16 vehicle_t::load_cargo(halthandle_t halt, const vector_tpl<halthandle_t>& destination_halts)
+uint16 vehicle_t::load_cargo(halthandle_t halt, const vector_tpl<halthandle_t>& destination_halts, uint16 max_amount )
 {
 	if(  !halt.is_bound()  ||  !halt->gibt_ab(desc->get_freight_type())  ) {
 		return 0;
 	}
 
 	const uint16 total_freight_start = total_freight;
-	const uint16 capacity_left = desc->get_capacity() - total_freight;
+	const uint16 capacity_left = min(desc->get_capacity() - total_freight, max_amount);
 	if (capacity_left > 0) {
 
 		slist_tpl<ware_t> freight_add;
@@ -1159,7 +1163,19 @@ void vehicle_t::display_after(int xpos, int ypos, bool is_global) const
 
 			case convoi_t::LOADING:
 				if(  state>=3  ) {
-					sprintf( tooltip_text, translator::translate("Loading (%i->%i%%)!"), cnv->get_loading_level(), cnv->get_loading_limit() );
+					if(  cnv->is_unloading()  ) {
+						sprintf( tooltip_text, translator::translate( "Unloading (%i%%)!" ), cnv->get_loading_level() );
+					}
+					else if(  cnv->get_schedule()->get_current_entry().minimum_loading == 0  &&  cnv->get_schedule()->get_current_entry().waiting_time >0  ) {
+						// is on a schedule
+						sprintf(tooltip_text, translator::translate("Loading (%i%%) departure %s!"), cnv->get_loading_level(), tick_to_string(cnv->get_departure_ticks(),true));
+					}
+					else if( cnv->get_loading_limit()==0 ){
+						sprintf( tooltip_text, translator::translate( "Loading (%i%%)!" ), cnv->get_loading_level(), cnv->get_loading_limit() );
+					}
+					else {
+						sprintf( tooltip_text, translator::translate( "Loading (%i->%i%%)!" ), cnv->get_loading_level(), cnv->get_loading_limit() );
+					}
 					color = color_idx_to_rgb(COL_YELLOW);
 				}
 				break;

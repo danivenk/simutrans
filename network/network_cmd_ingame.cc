@@ -944,6 +944,7 @@ void nwc_chg_player_t::do_command(karte_t *welt)
 
 
 nwc_tool_t::nwc_tool_t() : network_broadcast_world_command_t(NWC_TOOL, 0, 0),
+	init(false),
 	custom_data(custom_data_buf, lengthof(custom_data_buf), true)
 {
 	tool = NULL;
@@ -1028,7 +1029,7 @@ void nwc_tool_t::rdwr()
 	}
 
 	//if (packet->is_loading()) {
-		dbg->warning("nwc_tool_t::rdwr", "rdwr id=%d client=%d plnr=%d pos=%s tool_id=%d defpar=%s init=%d flags=%d", id, tool_client_id, player_nr, pos.get_str(), tool_id, (char const*)default_param, init, flags);
+	dbg->warning("nwc_tool_t::rdwr", "rdwr id=%d client=%d plnr=%d pos=%s tool_id=%s defpar=%s init=%d flags=%d", id, tool_client_id, player_nr, pos.get_str(), tool_t::id_to_string(tool_id), default_param.c_str(), init, flags);
 	//}
 }
 
@@ -1110,7 +1111,7 @@ network_broadcast_world_command_t* nwc_tool_t::clone(karte_t *welt)
 		// do scenario checks here, send error message back
 		if ( scen->is_scripted() ) {
 			if (!scen->is_tool_allowed(welt->get_player(player_nr), tool_id, wt)) {
-				dbg->warning("nwc_tool_t::clone", "tool_id=%d  wt=%d tool not allowed", tool_id, wt);
+				dbg->warning("nwc_tool_t::clone", "tool_id=%s  wt=%d tool not allowed", tool_t::id_to_string(tool_id), wt);
 				// TODO return error message ?
 				return NULL;
 			}
@@ -1129,7 +1130,7 @@ network_broadcast_world_command_t* nwc_tool_t::clone(karte_t *welt)
 					nwt->default_param = err;
 					nwt->last_sync_step = welt->get_last_checklist_sync_step();
 					nwt->last_checklist = welt->get_last_checklist();
-					dbg->warning("nwc_tool_t::clone", "send sync_steps=%d  tool_id=%d  error=%s", nwt->get_sync_step(), tool_id, err);
+					dbg->warning("nwc_tool_t::clone", "send sync_steps=%d  tool_id=%s  error=%s", nwt->get_sync_step(), tool_t::id_to_string(tool_id), err);
 					return nwt;
 				}
 			}
@@ -1140,7 +1141,7 @@ network_broadcast_world_command_t* nwc_tool_t::clone(karte_t *welt)
 	nwc_tool_t *nwt = new nwc_tool_t(*this);
 	nwt->last_sync_step = welt->get_last_checklist_sync_step();
 	nwt->last_checklist = welt->get_last_checklist();
-	dbg->warning("nwc_tool_t::clone", "send sync_steps=%d  tool_id=%d %s", nwt->get_sync_step(), tool_id, init ? "init" : "work");
+	dbg->warning("nwc_tool_t::clone", "send sync_steps=%d  tool_id=%s %s", nwt->get_sync_step(), tool_t::id_to_string(tool_id), init ? "init" : "work");
 	return nwt;
 }
 
@@ -1148,7 +1149,7 @@ network_broadcast_world_command_t* nwc_tool_t::clone(karte_t *welt)
 bool nwc_tool_t::ignore_old_events() const
 {
 	// messages are allowed to arrive at any time (return true if message)
-	return tool_id==(SIMPLE_TOOL|TOOL_ADD_MESSAGE);
+	return tool_id==(GENERAL_TOOL|TOOL_ADD_MESSAGE);
 }
 
 
@@ -1260,7 +1261,7 @@ bool nwc_service_t::execute(karte_t *welt)
 
 		case SRVC_ANNOUNCE_SERVER:
 			// Startup announce, to force full details resend
-			welt->announce_server( 0 );
+			welt->announce_server( karte_t::SERVER_ANNOUNCE_HELLO );
 			break;
 
 		case SRVC_GET_CLIENT_LIST: {

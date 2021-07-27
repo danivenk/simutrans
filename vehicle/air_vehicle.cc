@@ -230,7 +230,7 @@ bool air_vehicle_t::calc_route(koord3d start, koord3d ziel, sint32 max_speed, ro
 {
 //DBG_MESSAGE("aircraft_t::calc_route()","search route from %i,%i,%i to %i,%i,%i",start.x,start.y,start.z,ziel.x,ziel.y,ziel.z);
 
-	if(leading  &&  cnv) {
+ 	if(leading  &&  cnv) {
 		// free target reservation
 		if(  target_halt.is_bound() ) {
 			if (grund_t* const target = welt->lookup(cnv->get_route()->back())) {
@@ -967,7 +967,7 @@ void air_vehicle_t::display_after(int xpos_org, int ypos_org, bool is_global) co
 			current_flughohe -= (steps*TILE_HEIGHT_STEP) >> 8;
 		}
 
-		sint8 hoff = get_hoff();
+		sint16 hoff = get_hoff();
 		ypos += tile_raster_scale_y(get_yoff()-current_flughohe-hoff-2, raster_width);
 		xpos += tile_raster_scale_x(get_xoff(), raster_width);
 		get_screen_offset( xpos, ypos, raster_width );

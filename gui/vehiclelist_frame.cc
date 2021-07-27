@@ -159,11 +159,44 @@ vehiclelist_frame_t::vehiclelist_frame_t() :
 
 	add_table(3,0);
 	{
-		new_component<gui_label_t>( "hl_txt_sort" );
-		new_component<gui_empty_t>();
-		new_component<gui_empty_t>();
+		// next rows
+		bt_obsolete.init(button_t::square_state, "Show obsolete");
+		bt_obsolete.add_listener(this);
+		add_component(&bt_obsolete);
+
+		bt_future.init(button_t::square_state, "Show future");
+		bt_future.add_listener(this);
+		bt_future.pressed = true;
+		add_component(&bt_future);
+
+		ware_filter.clear_elements();
+		ware_filter.new_component<gui_scrolled_list_t::const_text_scrollitem_t>(translator::translate("All"), SYSCOL_TEXT);
+		idx_to_ware.append(NULL);
+		for (int i = 0; i < goods_manager_t::get_count(); i++) {
+			const goods_desc_t* ware = goods_manager_t::get_info(i);
+			if (ware == goods_manager_t::none) {
+				continue;
+			}
+			if (ware->get_catg() == 0) {
+				ware_filter.new_component<gui_scrolled_list_t::const_text_scrollitem_t>(translator::translate(ware->get_name()), SYSCOL_TEXT);
+				idx_to_ware.append(ware);
+			}
+		}
+		// now add other good categories
+		for (int i = 1; i < goods_manager_t::get_max_catg_index(); i++) {
+			const goods_desc_t* ware = goods_manager_t::get_info_catg(i);
+			if (ware->get_catg() != 0) {
+				ware_filter.new_component<gui_scrolled_list_t::const_text_scrollitem_t>(translator::translate(ware->get_catg_name()), SYSCOL_TEXT);
+				idx_to_ware.append(ware);
+			}
+		}
+		ware_filter.set_selection(0);
+		ware_filter.add_listener(this);
+		add_component(&ware_filter);
 
 		// second row
+		new_component<gui_label_t>( "hl_txt_sort" );
+
 		sort_by.clear_elements();
 		for( int i = 0; i < vehicle_builder_t::sb_length; i++ ) {
 			sort_by.new_component<gui_scrolled_list_t::const_text_scrollitem_t>(translator::translate(vehicle_builder_t::vehicle_sort_by[i]), SYSCOL_TEXT);
@@ -172,45 +205,10 @@ vehiclelist_frame_t::vehiclelist_frame_t() :
 		sort_by.add_listener( this );
 		add_component( &sort_by );
 
-		sorteddir.init( button_t::roundbox, vehiclelist_stats_t::reverse ? "hl_btn_sort_desc" : "hl_btn_sort_asc" );
+		sorteddir.init( button_t::sortarrow_state, NULL );
+		sorteddir.pressed = vehiclelist_stats_t::reverse;
 		sorteddir.add_listener( this );
 		add_component( &sorteddir );
-
-		ware_filter.clear_elements();
-		ware_filter.new_component<gui_scrolled_list_t::const_text_scrollitem_t>(translator::translate("All"), SYSCOL_TEXT);
-		idx_to_ware.append( NULL );
-		for(  int i=0;  i < goods_manager_t::get_count();  i++  ) {
-			const goods_desc_t *ware = goods_manager_t::get_info(i);
-			if(  ware == goods_manager_t::none  ) {
-				continue;
-			}
-			if(  ware->get_catg() == 0  ) {
-				ware_filter.new_component<gui_scrolled_list_t::const_text_scrollitem_t>(translator::translate(ware->get_name()), SYSCOL_TEXT);
-				idx_to_ware.append( ware );
-			}
-		}
-		// now add other good categories
-		for(  int i=1;  i < goods_manager_t::get_max_catg_index();  i++  ) {
-			const goods_desc_t *ware = goods_manager_t::get_info_catg(i);
-			if(  ware->get_catg() != 0  ) {
-				ware_filter.new_component<gui_scrolled_list_t::const_text_scrollitem_t>(translator::translate(ware->get_catg_name()), SYSCOL_TEXT);
-				idx_to_ware.append( ware );
-			}
-		}
-		ware_filter.set_selection( 0 );
-		ware_filter.add_listener( this );
-		add_component( &ware_filter );
-
-		// next rows
-		bt_obsolete.init( button_t::square_state, "Show obsolete" );
-		bt_obsolete.add_listener( this );
-		add_component( &bt_obsolete );
-
-		bt_future.init( button_t::square_state, "Show future" );
-		bt_future.add_listener( this );
-		bt_future.pressed = true;
-		add_component( &bt_future, 2 );
-
 	}
 	end_table();
 
@@ -242,6 +240,7 @@ bool vehiclelist_frame_t::action_triggered( gui_action_creator_t *comp,value_t v
 		vehiclelist_stats_t::reverse = !vehiclelist_stats_t::reverse;
 		sorteddir.set_text( vehiclelist_stats_t::reverse ? "hl_btn_sort_desc" : "hl_btn_sort_asc");
 		scrolly.sort(0);
+		sorteddir.pressed = vehiclelist_stats_t::reverse;
 	}
 	else if(comp == &bt_obsolete) {
 		bt_obsolete.pressed ^= 1;

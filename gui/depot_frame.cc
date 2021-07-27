@@ -1304,7 +1304,7 @@ bool depot_frame_t::action_triggered( gui_action_creator_t *comp, value_t p)
 		}
 		else if(  comp == &line_button  ) {
 			if(  cnv.is_bound()  ) {
-				cnv->get_owner()->simlinemgmt.show_lineinfo( cnv->get_owner(), cnv->get_line() );
+				cnv->get_owner()->simlinemgmt.show_lineinfo( cnv->get_owner(), cnv->get_line(), 0 );
 				welt->set_dirty();
 			}
 		}
@@ -1554,19 +1554,11 @@ void depot_frame_t::open_schedule_editor()
 
 	if(  cnv.is_bound()  &&  cnv->get_vehicle_count() > 0  ) {
 		if(  selected_line.is_bound()  &&  event_get_last_control_shift() == 2  ) { // update line with CTRL-click
-			create_win( new line_management_gui_t( selected_line, depot->get_owner() ), w_info, (ptrdiff_t)selected_line.get_rep() );
+			create_win( new line_management_gui_t( selected_line, depot->get_owner(), 0 ), w_info, (ptrdiff_t)selected_line.get_rep() );
 		}
 		else { // edit individual schedule
 			// this can happen locally, since any update of the schedule is done during closing window
-			schedule_t *schedule = cnv->create_schedule();
-			assert(schedule!=NULL);
-			gui_frame_t *schedulewin = win_get_magic( (ptrdiff_t)schedule );
-			if(  schedulewin == NULL  ) {
-				cnv->open_schedule_window( welt->get_active_player() == cnv->get_owner() );
-			}
-			else {
-				top_win( schedulewin );
-			}
+			cnv->open_schedule_window( welt->get_active_player() == cnv->get_owner() );
 		}
 	}
 	else {
@@ -1578,8 +1570,6 @@ void depot_frame_t::open_schedule_editor()
 void depot_frame_t::draw_vehicle_info_text(scr_coord pos)
 {
 	cbuffer_t buf;
-	const scr_size size = get_windowsize();
-	PUSH_CLIP(pos.x, pos.y, size.w-1, size.h-1);
 
 	gui_component_t const* const tab = tabs.get_aktives_tab();
 	gui_image_list_t const* const lst =
@@ -1638,7 +1628,7 @@ void depot_frame_t::draw_vehicle_info_text(scr_coord pos)
 				break;
 			}
 		}
-		display_proportional_rgb( pos.x + D_MARGIN_LEFT, pos.y + D_TITLEBAR_HEIGHT + div_tabbottom.get_pos().y + div_tabbottom.get_size().h + 1, c, ALIGN_LEFT, SYSCOL_TEXT, true );
+		display_proportional_clip_rgb( pos.x + D_MARGIN_LEFT, pos.y + D_TITLEBAR_HEIGHT + div_tabbottom.get_pos().y + div_tabbottom.get_size().h + 1, c, ALIGN_LEFT, SYSCOL_TEXT, true );
 	}
 
 	if(  veh_type  ) {
@@ -1728,8 +1718,6 @@ void depot_frame_t::draw_vehicle_info_text(scr_coord pos)
 		txt_convoi_number.clear();
 		new_vehicle_length_sb = 0;
 	}
-
-	POP_CLIP();
 }
 
 

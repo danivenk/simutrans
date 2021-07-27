@@ -89,7 +89,7 @@ static inthashtable_tpl<uint64, char*> ground_texts;
 #define get_ground_text_key(k) ( (uint64)(k).x + ((uint64)(k).y << 16) + ((uint64)(k).z << 32) )
 
 // and the reverse operation
-#define get_ground_koord3d_key(key) koord3d( (key) & 0x00007FFF, ((key)>>16) & 0x00007fff, (key)>>32 )
+#define get_ground_koord3d_key(key) koord3d( (key) & 0x00007FFF, ((key)>>16) & 0x00007fff, (sint8)((key)>>32) )
 
 void grund_t::set_text(const char *text)
 {
@@ -1811,9 +1811,9 @@ sint64 grund_t::neuen_weg_bauen(weg_t *weg, ribi_t::ribi ribi, player_t *player)
 			weg_t *other = (weg_t *)obj_bei(0);
 			// another way will be added
 			if(flags&has_way2) {
-				dbg->fatal("grund_t::neuen_weg_bauen()","cannot built more than two ways on %i,%i,%i!",pos.x,pos.y,pos.z);
-				return 0;
+				dbg->fatal("grund_t::neuen_weg_bauen()","cannot build more than two ways on %i,%i,%i!",pos.x,pos.y,pos.z);
 			}
+
 			// add the way
 			objlist.add( weg );
 			weg->set_ribi(ribi);
@@ -2082,14 +2082,6 @@ bool grund_t::remove_everything_from_way(player_t* player, waytype_t wt, ribi_t:
 					if (gr  &&  gr->is_water()) {
 						gr->calc_image(); // to recalculate ribis
 					}
-				}
-				// make tunnel portals to normal ground
-				if (get_typ()==tunnelboden  &&  (flags&has_way1)==0) {
-					// remove remaining objs
-					obj_loesche_alle( player );
-					// set to normal ground
-					welt->access(here)->kartenboden_setzen( new boden_t( pos, slope ) );
-					// now this is already deleted !
 				}
 			}
 		}

@@ -100,7 +100,6 @@ bool way_builder_t::successfully_loaded()
 	set_default(strasse_t::default_strasse,         road_wt,        type_flat, 50);
 	if(  strasse_t::default_strasse == NULL ) {
 		dbg->fatal( "way_builder_t::successfully_loaded()", "No road found at all!" );
-		return false;
 	}
 
 	set_default(schiene_t::default_schiene,         track_wt,       type_flat, 80);
@@ -1531,8 +1530,6 @@ DBG_DEBUG("way_builder_t::intern_calc_route()","steps=%i  (max %i) in route, ope
 		}
 		return cost;
 	}
-
-	return -1;
 }
 
 
@@ -2041,8 +2038,6 @@ DBG_DEBUG("way_builder_t::intern_calc_route()","steps=%i  (max %i) in route, ope
 		}
 		return cost;
 	}
-
-	return -1;
 }
 
 
@@ -2480,7 +2475,6 @@ bool way_builder_t::build_tunnel_tile()
 				lt->set_desc( wb );
 				tunnel->obj_add( lt );
 				lt->finish_rd();
-				player_t::add_maintenance( player_builder, -lt->get_desc()->get_maintenance(), powerline_wt);
 			}
 			tunnel->calc_image();
 			cost -= tunnel_desc->get_price();
@@ -2520,10 +2514,6 @@ bool way_builder_t::build_tunnel_tile()
 					lt = new leitung_t(gr->get_pos(), player_builder);
 					lt->set_desc( wb );
 					gr->obj_add( lt );
-				}
-				else {
-					lt->leitung_t::finish_rd(); // only change powerline aspect
-					player_t::add_maintenance( player_builder, -lt->get_desc()->get_maintenance(), powerline_wt);
 				}
 			}
 		}

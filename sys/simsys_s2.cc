@@ -3,7 +3,11 @@
  * (see LICENSE.txt)
  */
 
+#ifndef __APPLE__
 #include <SDL2/SDL.h>
+#else
+#include <SDL.h>
+#endif
 
 #ifdef _WIN32
 #include <windows.h>
@@ -461,14 +465,14 @@ void set_pointer(int loading)
 
 static inline unsigned int ModifierKeys()
 {
-	SDL_Keymod mod = SDL_GetModState();
+	const SDL_Keymod mod = SDL_GetModState();
 
 	return
-		(mod & KMOD_SHIFT ? 1 : 0)
-		| (mod & KMOD_CTRL ? 2 : 0)
+		  ((mod & KMOD_SHIFT) ? SIM_MOD_SHIFT : SIM_MOD_NONE)
+		| ((mod & KMOD_CTRL)  ? SIM_MOD_CTRL  : SIM_MOD_NONE)
 #ifdef __APPLE__
 		// Treat the Command key as a control key.
-		| (mod & KMOD_GUI ? 2 : 0)
+		| ((mod & KMOD_GUI)   ? SIM_MOD_CTRL  : SIM_MOD_NONE)
 #endif
 		;
 }
@@ -524,8 +528,8 @@ static void internal_GetEvents(bool const wait)
 	switch(  event.type  ) {
 		case SDL_WINDOWEVENT: {
 			if(  event.window.event == SDL_WINDOWEVENT_SIZE_CHANGED  ) {
-				sys_event.new_window_size.w = SCREEN_TO_TEX_X(event.window.data1);
-				sys_event.new_window_size.h = SCREEN_TO_TEX_Y(event.window.data2);
+				sys_event.new_window_size_w = SCREEN_TO_TEX_X(event.window.data1);
+				sys_event.new_window_size_h = SCREEN_TO_TEX_Y(event.window.data2);
 				sys_event.type = SIM_SYSTEM;
 				sys_event.code = SYSTEM_RESIZE;
 			}
@@ -616,16 +620,16 @@ static void internal_GetEvents(bool const wait)
 				case SDLK_F13:        code = SIM_KEY_F13;                   break;
 				case SDLK_F14:        code = SIM_KEY_F14;                   break;
 				case SDLK_F15:        code = SIM_KEY_F15;                   break;
-				case SDLK_KP_0:       np = true; code = (numlock ? '0' : SIM_KEY_NUMPAD_BASE); break;
-				case SDLK_KP_1:       np = true; code = (numlock ? '1' : SIM_KEY_DOWNLEFT); break;
-				case SDLK_KP_2:       np = true; code = (numlock ? '2' : SIM_KEY_DOWN); break;
-				case SDLK_KP_3:       np = true; code = (numlock ? '3' : SIM_KEY_DOWNRIGHT); break;
-				case SDLK_KP_4:       np = true; code = (numlock ? '4' : SIM_KEY_LEFT); break;
-				case SDLK_KP_5:       np = true; code = (numlock ? '5' : SIM_KEY_CENTER); break;
-				case SDLK_KP_6:       np = true; code = (numlock ? '6' : SIM_KEY_RIGHT); break;
-				case SDLK_KP_7:       np = true; code = (numlock ? '7' : SIM_KEY_UPLEFT); break;
-				case SDLK_KP_8:       np = true; code = (numlock ? '8' : SIM_KEY_UP); break;
-				case SDLK_KP_9:       np = true; code = (numlock ? '9' : SIM_KEY_UPRIGHT); break;
+				case SDLK_KP_0:       np = true; code = (numlock ? '0' : (unsigned long)SIM_KEY_NUMPAD_BASE); break;
+				case SDLK_KP_1:       np = true; code = (numlock ? '1' : (unsigned long)SIM_KEY_DOWNLEFT); break;
+				case SDLK_KP_2:       np = true; code = (numlock ? '2' : (unsigned long)SIM_KEY_DOWN); break;
+				case SDLK_KP_3:       np = true; code = (numlock ? '3' : (unsigned long)SIM_KEY_DOWNRIGHT); break;
+				case SDLK_KP_4:       np = true; code = (numlock ? '4' : (unsigned long)SIM_KEY_LEFT); break;
+				case SDLK_KP_5:       np = true; code = (numlock ? '5' : (unsigned long)SIM_KEY_CENTER); break;
+				case SDLK_KP_6:       np = true; code = (numlock ? '6' : (unsigned long)SIM_KEY_RIGHT); break;
+				case SDLK_KP_7:       np = true; code = (numlock ? '7' : (unsigned long)SIM_KEY_UPLEFT); break;
+				case SDLK_KP_8:       np = true; code = (numlock ? '8' : (unsigned long)SIM_KEY_UP); break;
+				case SDLK_KP_9:       np = true; code = (numlock ? '9' : (unsigned long)SIM_KEY_UPRIGHT); break;
 				case SDLK_KP_ENTER:   code = SIM_KEY_ENTER;                 break;
 				case SDLK_LEFT:       code = SIM_KEY_LEFT;                  break;
 				case SDLK_PAGEDOWN:   code = '<';                           break;
@@ -636,7 +640,7 @@ static void internal_GetEvents(bool const wait)
 				case SDLK_SCROLLLOCK: code = SIM_KEY_SCROLLLOCK;            break;
 				default: {
 					// Handle CTRL-keys. SDL_TEXTINPUT event handles regular input
-					if(  (sys_event.key_mod & 2)  &&  SDLK_a <= sym  &&  sym <= SDLK_z  ) {
+					if(  (sys_event.key_mod & SIM_MOD_CTRL)  &&  SDLK_a <= sym  &&  sym <= SDLK_z  ) {
 						code = event.key.keysym.sym & 31;
 					}
 					else {
@@ -786,6 +790,25 @@ void dr_notify_input_pos(int x, int y)
 	SDL_Rect rect = { TEX_TO_SCREEN_X(x), TEX_TO_SCREEN_Y(y + LINESPACE), 1, 1};
 	SDL_SetTextInputRect( &rect );
 }
+
+
+
+const char* dr_get_locale()
+{
+	static char LanguageCode[5] = "";
+#if SDL_VERSION_ATLEAST(2, 0, 14)
+	SDL_Locale *loc = SDL_GetPreferredLocales();
+	if( loc ) {
+		strncpy( LanguageCode, loc->language, 2 );
+		LanguageCode[2] = 0;
+	}
+#elif defined(_WIN32)
+	GetLocaleInfoA( GetUserDefaultUILanguage(), LOCALE_SISO639LANGNAME, LanguageCode, lengthof( LanguageCode ) );
+	return LanguageCode;
+#endif
+	return LanguageCode;
+}
+
 
 #ifdef _MSC_VER
 // Needed for MS Visual C++ with /SUBSYSTEM:CONSOLE to work , if /SUBSYSTEM:WINDOWS this function is compiled but unreachable

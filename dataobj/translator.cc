@@ -73,20 +73,6 @@ const translator::lang_info* translator::get_langs()
 }
 
 
-#ifdef need_dump_hashtable
-// diagnosis
-static void dump_hashtable(stringhashtable_tpl<const char*>* tbl)
-{
-	printf("keys\n====\n");
-	tbl->dump_stats();
-	printf("entries\n=======\n");
-	FOR(stringhashtable_tpl<char const*>, const& i, *tbl) {
-		printf("%s\n", i.object);
-	}
-	fflush(NULL);
-}
-#endif
-
 /* first two file functions needed in connection with utf */
 
 /**
@@ -98,7 +84,9 @@ static bool is_unicode_file(FILE* f)
 	int pos = ftell(f);
 //	DBG_DEBUG("is_unicode_file()", "checking for unicode");
 //	fflush(NULL);
-	fread( str, 1, 2,  f );
+	if (fread( str, 1, 2,  f ) != 2) {
+		return false;
+	}
 //	DBG_DEBUG("is_unicode_file()", "file starts with %x%x",str[0],str[1]);
 //	fflush(NULL);
 	if (str[0] == 0xC2 && str[1] == 0xA7) {
@@ -109,7 +97,9 @@ static bool is_unicode_file(FILE* f)
 	if(  str[0]==0xEF  &&  str[1]==0xBB   &&  fgetc(f)==0xBF  ) {
 		// the first letter is the byte order mark => may need to skip a paragraph (Latin A7, UTF8 C2 A7)
 		pos = ftell(f);
-		fread( str, 1, 2,  f );
+		if (fread( str, 1, 2,  f ) != 2) {
+			return false;
+		}
 		if(  str[0] != 0xC2  ||  str[1] == 0xA7  ) {
 			fseek(f, pos, SEEK_SET);
 			dbg->error( "is_unicode_file()", "file is UTF-8 but has no paragraph" );
@@ -445,7 +435,7 @@ bool translator::load(const string &path_to_pakset)
 			load_language_file(file);
 			fclose(file);
 			single_instance.lang_count++;
-			if (single_instance.lang_count == lengthof(langs)) {
+			if (single_instance.lang_count == (int)lengthof(langs)) {
 				if (++i != end) {
 					// some languages were not loaded, let the user know what happened
 					dbg->warning("translator::load()", "some languages were not loaded, limit reached");
@@ -498,10 +488,6 @@ bool translator::load(const string &path_to_pakset)
 		dr_chdir( env_t::data_dir );
 	}
 
-#if DEBUG>=4
-	dump_hashtable(&compatibility);
-#endif
-
 	// use english if available
 	current_langinfo = get_lang_by_iso("en");
 
@@ -552,19 +538,22 @@ int translator::get_language(const char *iso)
 }
 
 
-void translator::set_language(const char *iso)
+bool translator::set_language(const char *iso)
 {
 	for(  int i = 0;  i < single_instance.lang_count;  i++  ) {
 		const char *iso_base = langs[i].iso_base;
 		if(  iso_base[0] == iso[0]  &&  iso_base[1] == iso[1]  ) {
 			set_language(i);
-			return;
+			return true;
 		}
 	}
+
 	// if the request language does not exist
 	if( single_instance.current_lang == -1 ) {
 		set_language(0);
 	}
+
+	return false;
 }
 
 
@@ -647,28 +636,28 @@ const char *translator::get_date(uint16 year, uint16 month, uint16 day, char con
 	static char date[256];
 	switch(env_t::show_month) {
 		case env_t::DATE_FMT_GERMAN:
-			sprintf(date, "%s %d. %s %d%s", season, day, month_, year, year_sym);
+			sprintf(date, "%s %d. %s %d%s ", season, day, month_, year, year_sym);
 			break;
 		case env_t::DATE_FMT_GERMAN_NO_SEASON:
-			sprintf(date, "%d. %s %d%s", day, month_, year, year_sym);
+			sprintf(date, "%d. %s %d%s ", day, month_, year, year_sym);
 			break;
 		case env_t::DATE_FMT_US:
-			sprintf(date, "%s %s %d %d%s", season, month_, day, year, year_sym);
+			sprintf(date, "%s %s %d %d%s ", season, month_, day, year, year_sym);
 			break;
 		case env_t::DATE_FMT_US_NO_SEASON:
-			sprintf(date, "%s %d %d%s", month_, day, year, year_sym);
+			sprintf(date, "%s %d %d%s ", month_, day, year, year_sym);
 			break;
 		case env_t::DATE_FMT_JAPANESE:
-			sprintf(date, "%s %d%s %s %d%s", season, year, year_sym, month_, day, day_sym);
+			sprintf(date, "%s %d%s %s %d%s ", season, year, year_sym, month_, day, day_sym);
 			break;
 		case env_t::DATE_FMT_JAPANESE_NO_SEASON:
-			sprintf(date, "%d%s %s %d%s", year, year_sym, month_, day, day_sym);
+			sprintf(date, "%d%s %s %d%s ", year, year_sym, month_, day, day_sym);
 			break;
 		case env_t::DATE_FMT_MONTH:
-			sprintf(date, "%s, %s %d%s", month_, season, year, year_sym);
+			sprintf(date, "%s, %s %d%s ", month_, season, year, year_sym);
 			break;
 		case env_t::DATE_FMT_SEASON:
-			sprintf(date, "%s %d%s", season, year, year_sym);
+			sprintf(date, "%s %d%s ", season, year, year_sym);
 			break;
 	}
 	return date;
@@ -695,6 +684,60 @@ const char *translator::get_short_date(uint16 year, uint16 month)
 	return sdate;
 }
 
+
+const char* translator::get_month_date( uint16 month, uint16 day )
+{
+	char const* const month_ = get_month_name( month );
+	char const* const day_sym = strcmp( "DAY_SYMBOL", translate( "DAY_SYMBOL" ) )?translate( "DAY_SYMBOL" ):"";
+	static char date[256];
+	switch( env_t::show_month ) {
+	case env_t::DATE_FMT_GERMAN:
+	case env_t::DATE_FMT_GERMAN_NO_SEASON:
+		sprintf( date, "%d. %s ", day, month_ );
+		break;
+	case env_t::DATE_FMT_US:
+	case env_t::DATE_FMT_US_NO_SEASON:
+		sprintf( date, "%s %d ", month_, day );
+		break;
+	case env_t::DATE_FMT_JAPANESE:
+	case env_t::DATE_FMT_JAPANESE_NO_SEASON:
+		sprintf( date, "%s %d%s", month_, day, day_sym );
+		break;
+	case env_t::DATE_FMT_SEASON:
+	case env_t::DATE_FMT_MONTH:
+		sprintf( date, "%s, ", month_ );
+		break;
+	}
+	return date;
+}
+
+
+const char* translator::get_day_date(uint16 day)
+{
+	char const* const day_sym = strcmp("ORDINAL_DAR_SYMBOL", translate("ORDINAL_DAR_SYMBOL")) ? translate("ORDINAL_DAR_SYMBOL") : "th ";
+	static char date[256];
+	switch( env_t::show_month ) {
+	case env_t::DATE_FMT_GERMAN:
+	case env_t::DATE_FMT_GERMAN_NO_SEASON:
+		sprintf( date, "%d%s", day, day_sym );
+		return translator::translate( date );
+
+	case env_t::DATE_FMT_US:
+	case env_t::DATE_FMT_US_NO_SEASON:
+		sprintf( date, "%d%s", day, day_sym );
+		return translator::translate( date );
+
+	case env_t::DATE_FMT_JAPANESE:
+	case env_t::DATE_FMT_JAPANESE_NO_SEASON:
+		sprintf( date, "%d%s", day, day_sym );
+		return translator::translate( date );
+
+	case env_t::DATE_FMT_SEASON:
+	case env_t::DATE_FMT_MONTH:
+		break;
+	}
+	return "";
+}
 
 /* get a name for a non-matching object */
 const char *translator::compatibility_name(const char *str)

@@ -416,7 +416,7 @@ class industry_connection_planner_t extends manager_t
 		if ( freight_input > 2250 || freight_output > 1700 ) {
 			switch (wt) {
 				case wt_rail:
-				  r.points += 15
+				  r.points += 22
 			    break
 				case wt_road:
 				  r.points -= 15
@@ -462,7 +462,7 @@ class industry_connection_planner_t extends manager_t
 						r.points += 20
 						cash_buffer = 10
 					}
-					if ( planned_bridge.tiles > 30 ) {
+					if ( planned_bridge.tiles > 25 ) {
 						r.points -= (25*bridge_year_factor)
 					}
 					if ( planned_convoy.max_speed < 50 ) {
@@ -472,7 +472,7 @@ class industry_connection_planner_t extends manager_t
 			    break
 				case wt_road:
 					if ( f_dist_long < r.distance ) {
-				  	r.points -= 20
+				  	r.points -= 25
 						cash_buffer = 20
 					} else {
 						r.points -= 10
@@ -546,7 +546,7 @@ class industry_connection_planner_t extends manager_t
 		if  ( r.distance > 120 && r.distance < 350 ) {
 			switch (wt) {
 				case wt_rail:
-					if ( planned_bridge.tiles > 30 ) {
+					if ( planned_bridge.tiles > 25 ) {
 						r.points -= (15*bridge_year_factor)
 					}
 			    break
@@ -565,7 +565,7 @@ class industry_connection_planner_t extends manager_t
     if ( g > 32 ) {
 			switch (wt) {
 				case wt_rail:
-					r.points += 16
+					r.points += 22
 			    break
 				case wt_road:
         	r.points -= 8
@@ -579,10 +579,49 @@ class industry_connection_planner_t extends manager_t
     if ( g < 20 ) {
 			switch (wt) {
 				case wt_rail:
-					r.points -= 8
+					r.points -= 12
 			    break
 				case wt_road:
-          r.points += 12
+          r.points += 14
+			    break
+				case wt_water:
+
+			    break
+			}
+		}
+
+		// citycars on map - rate per tile
+		local citycar_count = world.get_year_citycars()
+		local map_size_tiles = world.get_size().x * world.get_size().y
+		local map_citizens = world.get_citizens()
+		local citycar_rate = (map_citizens[0]/10)/ max(citycar_count[0], 1)
+
+		gui.add_message_at(our_player, "citycar_count[0] " + citycar_count[0] + " citycar_rate " + citycar_rate, world.get_time())
+
+		if ( citycar_rate < 10 ) {
+			switch (wt) {
+				case wt_rail:
+					r.points += 25
+			    break
+				case wt_road:
+          r.points -= 25
+			    break
+				case wt_water:
+
+			    break
+			}
+		}
+
+		// Adjustments to the pakset
+		//gui.add_message_at(our_player, "get_set_name() " + get_set_name(), world.get_time())
+		//::debug.pause()
+		if ( get_set_name() == "pak128.german" ) {
+			switch (wt) {
+				case wt_rail:
+					r.points += 20
+			    break
+				case wt_road:
+          r.points -= 15
 			    break
 				case wt_water:
 
@@ -799,8 +838,8 @@ function check_factory_links(f_src, f_dest, good) {
 					gui.add_message_at(player_x(1), "--> good: " + good, world.get_time())
 				}
 
-		local fs = fsrc.get_tile_list()
-		local fd = fdest.get_tile_list()
+		local fs = f_src.get_tile_list()
+		local fd = f_dest.get_tile_list()
 
 		local print_status = 0
 

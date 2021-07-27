@@ -78,7 +78,6 @@ enum {
 	TOOL_EXEC_TWO_CLICK_SCRIPT,
 	TOOL_PLANT_GROUNDOBJ,
 	TOOL_ADD_MESSAGE,
-	TOOL_CHANGE_CITY_OF_CITYBUILDING,
 	GENERAL_TOOL_COUNT,
 	GENERAL_TOOL = 0x1000
 };
@@ -123,6 +122,7 @@ enum {
 	TOOL_HIDE_UNDER_CURSOR,
 	TOOL_MOVE_MAP,
 	TOOL_ROLLUP_ALL_WIN,
+	TOOL_RECOLOUR_TOOL,
 	SIMPLE_TOOL_COUNT,
 	SIMPLE_TOOL = 0x2000
 };
@@ -176,6 +176,7 @@ enum {
 	TOOLBAR_TOOL = 0x8000u
 };
 
+
 class tool_t {
 protected:
 	image_id icon;
@@ -189,6 +190,10 @@ protected:
 	const char *default_param;
 public:
 	uint16 get_id() const { return id; }
+
+	const char *get_name() const { return id_to_string(id); }
+
+	static const char *id_to_string(uint16 id);
 
 	static tool_t *dummy;
 

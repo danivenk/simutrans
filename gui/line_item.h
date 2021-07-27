@@ -23,12 +23,14 @@ public:
 		SORT_BY_NAME = 0,
 		SORT_BY_ID,
 		SORT_BY_PROFIT,
+		SORT_BY_REVENUE,
 		SORT_BY_TRANSPORTED,
 		SORT_BY_CONVOIS,
 		SORT_BY_DISTANCE,
 		MAX_SORT_MODES
 	};
 	static sort_modes_t sort_mode;
+	static bool sort_reverse;
 	// to update selected status
 	void draw( scr_coord offset ) OVERRIDE;
 	// normal items

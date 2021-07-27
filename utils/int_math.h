@@ -3,15 +3,16 @@
  * (see LICENSE.txt)
  */
 
-#ifndef UTILS_MATH_H
-#define UTILS_MATH_H
+#ifndef UTILS_INT_MATH_H
+#define UTILS_INT_MATH_H
+
 
 #include "../simtypes.h"
 
 
 inline int log2(uint64 n)
 {
-#define S(k) if (n >= (UINT64_C(1) << k)) { i += k; n >>= k; }
+#define S(k) do { if (n >= (UINT64_C(1) << k)) { i += k; n >>= k; } } while(false)
 
 	int i = -(n == 0);
 	S(32);
@@ -27,7 +28,7 @@ inline int log2(uint64 n)
 
 inline int log2(uint32 n)
 {
-#define S(k) if (n >= (UINT64_C(1) << k)) { i += k; n >>= k; }
+#define S(k) do { if (n >= (UINT64_C(1) << k)) { i += k; n >>= k; } } while (false)
 
 	int i = -(n == 0);
 	S(16);
@@ -42,7 +43,7 @@ inline int log2(uint32 n)
 
 inline int log2(uint16 n)
 {
-#define S(k) if (n >= (UINT64_C(1) << k)) { i += k; n >>= k; }
+#define S(k) do { if (n >= (UINT64_C(1) << k)) { i += k; n >>= k; } } while(false)
 
 	int i = -(n == 0);
 	S(8);
@@ -56,7 +57,7 @@ inline int log2(uint16 n)
 
 inline int log10(uint64 n)
 {
-#define S(k, m) if (n >= UINT64_C(m)) { i += k; n /= UINT64_C(m); }
+#define S(k, m) do { if (n >= UINT64_C(m)) { i += k; n /= UINT64_C(m); } } while(false)
 
 	int i = -(n == 0);
 	S(16,10000000000000000);

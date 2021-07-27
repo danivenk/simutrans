@@ -280,7 +280,6 @@ bool stadt_t::cityrules_init(const std::string &objfilename)
 	if (!cityconf.open((user_dir+"cityrules.tab").c_str())) {
 		if (!cityconf.open((objfilename+"config/cityrules.tab").c_str())) {
 			dbg->fatal("stadt_t::init()", "Can't read cityrules.tab" );
-			return false;
 		}
 	}
 
@@ -359,7 +358,7 @@ bool stadt_t::cityrules_init(const std::string &objfilename)
 		}
 
 		// put rule into memory
-		const uint8 offset = (7 - (uint)size) / 2;
+		const uint8 offset = (7 - (uint8)size) / 2;
 		for (uint y = 0; y < size; y++) {
 			for (uint x = 0; x < size; x++) {
 				const char flag = rule[x + y * (size + 1)];
@@ -403,7 +402,7 @@ bool stadt_t::cityrules_init(const std::string &objfilename)
 		}
 
 		// put rule into memory
-		const uint8 offset = (7 - (uint)size) / 2;
+		const uint8 offset = (7 - (uint8)size) / 2;
 		for (uint y = 0; y < size; y++) {
 			for (uint x = 0; x < size; x++) {
 				const char flag = rule[x + y * (size + 1)];
@@ -2375,7 +2374,7 @@ void stadt_t::check_bau_spezial(bool new_town)
 				if (desc->get_all_layouts() > 1) {
 					rotate = (simrand(20) & 2) + is_rotate;
 				}
-				hausbauer_t::build( owner, welt->lookup_kartenboden(best_pos)->get_pos(), rotate, desc );
+				hausbauer_t::build( owner, best_pos, rotate, desc );
 				// tell the player, if not during initialization
 				if (!new_town) {
 					cbuffer_t buf;
@@ -2441,7 +2440,7 @@ void stadt_t::check_bau_spezial(bool new_town)
 						}
 					}
 					// and then build it
-					const gebaeude_t* gb = hausbauer_t::build(owner, welt->lookup_kartenboden(best_pos + koord(1, 1))->get_pos(), 0, desc);
+					const gebaeude_t* gb = hausbauer_t::build(owner, best_pos + koord(1, 1), 0, desc);
 					hausbauer_t::monument_erected(desc);
 					add_gebaeude_to_stadt(gb);
 					// tell the player, if not during initialization
@@ -2634,7 +2633,7 @@ void stadt_t::check_bau_townhall(bool new_town)
 			dbg->error( "stadt_t::check_bau_townhall", "no better position found!" );
 			return;
 		}
-		gebaeude_t const* const new_gb = hausbauer_t::build(owner, welt->lookup_kartenboden(best_pos + offset)->get_pos(), layout, desc);
+		gebaeude_t const* const new_gb = hausbauer_t::build(owner, best_pos + offset, layout, desc);
 		DBG_MESSAGE("new townhall", "use layout=%i", layout);
 		add_gebaeude_to_stadt(new_gb);
 		// sets has_townhall to true
@@ -3172,7 +3171,7 @@ void stadt_t::build_city_building(const koord k)
 	// so we found at least one suitable building for this place
 	int rotation = orient_city_building( k, h, maxsize );
 	if(  rotation >= 0  ) {
-		const gebaeude_t* gb = hausbauer_t::build(NULL, welt->lookup_kartenboden(k)->get_pos(), rotation, h);
+		const gebaeude_t* gb = hausbauer_t::build(NULL, k, rotation, h);
 		add_gebaeude_to_stadt(gb);
 	}
 	// to be extended for larger building ...
@@ -3223,8 +3222,8 @@ void stadt_t::renovate_city_building(gebaeude_t *gb)
 	// since we handle buildings larger than (1x1) we test all periphery
 	koord lu = k - koord( 1, 1 );
 	koord rd = k + minsize;
-	for( KOORD_VAL x = lu.x; x<=rd.x; x++ ) {
-		for( KOORD_VAL y = lu.y; y<=rd.y; y++ ) {
+	for( sint16 x = lu.x; x<=rd.x; x++ ) {
+		for( sint16 y = lu.y; y<=rd.y; y++ ) {
 			if(  koord(x,y)!=k  ) {
 				if(  grund_t *gr = welt->lookup_kartenboden(x,y)  ) {
 					if(  gebaeude_t const* const testgb = gr->find<gebaeude_t>()  ) {

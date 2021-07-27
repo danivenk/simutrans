@@ -5,7 +5,12 @@
 
 /// sdl-sound without SDL_mixer.dll
 
+#ifndef __APPLE__
 #include <SDL2/SDL.h>
+#else
+#include <SDL.h>
+#endif
+
 #include <string.h>
 #include "sound.h"
 #include "../simmem.h"
@@ -206,7 +211,7 @@ int dr_load_sample(const char *filename)
 
 /**
  * plays a sample
- * @param key the key for the sample to be played
+ * @param sample_number the key for the sample to be played
  */
 void dr_play_sample(int sample_number, int volume)
 {

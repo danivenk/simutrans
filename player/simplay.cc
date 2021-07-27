@@ -106,13 +106,12 @@ void player_t::book_construction_costs(player_t * const player, const sint64 amo
 
 sint64 player_t::add_maintenance(sint64 change, waytype_t const wt)
 {
-	int tmp = 0;
 #ifdef MULTI_THREAD
-		pthread_mutex_lock( &load_mutex  );
+	pthread_mutex_lock( &load_mutex );
 #endif
-	tmp = finance->book_maintenance(change, wt);
+	const sint64 tmp = finance->book_maintenance(change, wt);
 #ifdef MULTI_THREAD
-		pthread_mutex_unlock( &load_mutex  );
+	pthread_mutex_unlock( &load_mutex );
 #endif
 	return tmp;
 }
@@ -578,6 +577,7 @@ void player_t::ai_bankrupt()
 								break;
 							case obj_t::gebaeude:
 								hausbauer_t::remove( this, (gebaeude_t *)obj );
+								gr = plan->get_boden_bei(b); // fundament has now been replaced by normal ground
 								break;
 							case obj_t::way:
 							{

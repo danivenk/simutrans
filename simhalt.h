@@ -114,7 +114,7 @@ private:
 
 	PIXVAL status_color, last_status_color;
 	sint16 last_bar_count;
-	vector_tpl<KOORD_VAL> last_bar_height; // caches the last height of the station bar for each good type drawn in display_status(). used for dirty tile management
+	vector_tpl<scr_coord_val> last_bar_height; // caches the last height of the station bar for each good type drawn in display_status(). used for dirty tile management
 	uint32 capacity[3]; // passenger, mail, goods
 	uint8 overcrowded[256/8]; ///< bit field for each goods type (max 256)
 
@@ -217,7 +217,7 @@ public:
 		convoihandle_t reservation;
 	};
 
-	const slist_tpl<tile_t> &get_tiles() const { return tiles; };
+	const slist_tpl<tile_t> &get_tiles() const { return tiles; }
 
 	/**
 	 * directly reachable halt with its connection weight
@@ -382,7 +382,7 @@ public:
 	/**
 	 * Draws some nice colored bars giving some status information
 	 */
-	void display_status(KOORD_VAL xpos, KOORD_VAL ypos);
+	void display_status(sint16 xpos, sint16 ypos);
 
 	/**
 	 * sucht umliegende, erreichbare fabriken und baut daraus die
@@ -630,9 +630,7 @@ public:
 	 * Fetches goods from this halt
 	 * @param load Output parameter. Goods will be put into this list, the vehicle has to load them.
 	 * @param good_category Specifies the kind of good (or compatible goods) we are requesting to fetch from this stop.
-	 * @param amount How many units of the cargo we can fetch.
-	 * @param schedule Schedule of the vehicle requesting the fetch.
-	 * @param sp Company that's requesting the fetch.
+	 * @param requested_amount How many units of the cargo we can fetch.
 	 */
 	void fetch_goods( slist_tpl<ware_t> &load, const goods_desc_t *good_category, uint32 requested_amount, const vector_tpl<halthandle_t>& destination_halts);
 
@@ -673,14 +671,12 @@ public:
 	bool is_reservable(const grund_t *gr, convoihandle_t cnv) const;
 
 	/**
-	 * @param buf the buffer to fill
-	 * @return Goods description text (buf)
+	 * @param[out] buf Goods description text
 	 */
 	void get_freight_info(cbuffer_t & buf);
 
 	/**
-	 * @param buf the buffer to fill
-	 * @return short list of the waiting goods (i.e. 110 Wood, 15 Coal)
+	 * @param[out] buf short list of the waiting goods (i.e. 110 Wood, 15 Coal)
 	 */
 	void get_short_freight_info(cbuffer_t & buf) const;
 

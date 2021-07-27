@@ -90,6 +90,12 @@ private:
 	 */
 	sint32 wait_lock;
 
+	/**
+	 * The convoi is gradually loaded for each vehicle, i.e. there is a constant loadin speed.
+	 * Hence the tick value
+	 */
+	uint32 last_load_tick;
+
 	states state;
 	// 32 bytes (state is int is 4 byte)
 
@@ -131,6 +137,9 @@ private:
 	 * The slowdown is done by the vehicle routines
 	 */
 	uint16 next_stop_index;
+
+	// if state == LOADING, this is true while unloading
+	bool unloading_state;
 
 	sint32 speed_limit;
 	// needed for speed control/calculation
@@ -374,6 +383,10 @@ private:
 	uint32 move_to(uint16 start_index);
 
 public:
+	uint32 get_arrival_ticks() const { return arrived_time; }
+
+	uint32 get_departure_ticks() const;
+
 	/**
 	* Convoi haelt an Haltestelle und setzt quote fuer Fracht
 	*/
@@ -423,6 +436,8 @@ public:
 	* true if in waiting state (maybe also due to starting)
 	*/
 	bool is_waiting() { return (state>=WAITING_FOR_CLEARANCE  &&  state<=CAN_START_TWO_MONTHS)  &&  state!=SELF_DESTRUCT; }
+
+	bool is_unloading() { return state==LOADING  &&  unloading_state; }
 
 	/**
 	* reset state to no error message
@@ -639,15 +654,14 @@ public:
 	void open_info_window();
 
 	/**
-	* @return a description string for the object, der z.B. in einem
+	* @param[out] buf a description string for the object, der z.B. in einem
 	* Beobachtungsfenster angezeigt wird.
 	* @see simwin
 	*/
 	void info(cbuffer_t & buf) const;
 
 	/**
-	* @param buf the buffer to fill
-	* @return Freight description text (buf)
+	* @param[out] buf Filled with freight description
 	*/
 	void get_freight_info(cbuffer_t & buf);
 	void set_sortby(uint8 order);

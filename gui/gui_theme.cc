@@ -59,6 +59,7 @@ PIXVAL gui_theme_t::gui_shadow_color;
 PIXVAL gui_theme_t::gui_color_loadingbar_inner;
 PIXVAL gui_theme_t::gui_color_loadingbar_progress;
 PIXVAL gui_theme_t::gui_color_obsolete;
+PIXVAL gui_theme_t::gui_color_chat_window_network_transparency;
 PIXVAL gui_theme_t::gui_color_empty;
 
 /**
@@ -83,20 +84,20 @@ scr_size gui_theme_t::gui_label_size;
 scr_size gui_theme_t::gui_edit_size;
 scr_size gui_theme_t::gui_gadget_size;
 scr_size gui_theme_t::gui_indicator_size;
-KOORD_VAL gui_theme_t::gui_waitingbar_width;
+scr_coord_val gui_theme_t::gui_waitingbar_width;
 
 scr_coord gui_theme_t::gui_focus_offset;
 scr_coord gui_theme_t::gui_button_text_offset_right;
 scr_coord gui_theme_t::gui_color_button_text_offset_right;
 
-KOORD_VAL gui_theme_t::gui_titlebar_height;
-KOORD_VAL gui_theme_t::gui_frame_left;
-KOORD_VAL gui_theme_t::gui_frame_top;
-KOORD_VAL gui_theme_t::gui_frame_right;
-KOORD_VAL gui_theme_t::gui_frame_bottom;
-KOORD_VAL gui_theme_t::gui_hspace;
-KOORD_VAL gui_theme_t::gui_vspace;
-KOORD_VAL gui_theme_t::gui_filelist_vspace;
+scr_coord_val gui_theme_t::gui_titlebar_height;
+scr_coord_val gui_theme_t::gui_frame_left;
+scr_coord_val gui_theme_t::gui_frame_top;
+scr_coord_val gui_theme_t::gui_frame_right;
+scr_coord_val gui_theme_t::gui_frame_bottom;
+scr_coord_val gui_theme_t::gui_hspace;
+scr_coord_val gui_theme_t::gui_vspace;
+scr_coord_val gui_theme_t::gui_filelist_vspace;
 
 /* those are the 3x3 images which are used for stretching
  * also 1x3 and 3x1 subsets are possible
@@ -214,6 +215,8 @@ void gui_theme_t::init_gui_defaults()
 	gui_divider_size.h   = D_V_SPACE*2;
 
 	gui_drop_shadows     = false;
+
+	gui_color_chat_window_network_transparency = color_idx_to_rgb(COL_WHITE);
 }
 
 
@@ -258,7 +261,7 @@ void gui_theme_t::init_gui_from_images()
 			button_tiles[i][j%3][j/3] = skinverwaltung_t::button->get_image_id( i*9+j );
 		}
 	}
-	image_id has_second_mask;
+	image_id has_second_mask = 0xFFFF;
 	for(  int i=0;  i<2;  i++  ) {
 		has_second_mask = 0xFFFF;
 		for(  int j=0;  j<9;  j++  ) {
@@ -522,6 +525,7 @@ bool gui_theme_t::themes_init(const char *file_name, bool init_fonts, bool init_
 	gui_theme_t::gui_color_loadingbar_progress          = (PIXVAL)contents.get_color("gui_color_loadingbar_progress", SYSCOL_LOADINGBAR_PROGRESS);
 	gui_theme_t::gui_color_obsolete                     = (PIXVAL)contents.get_color("gui_color_obsolete", SYSCOL_OBSOLETE);
 	gui_theme_t::gui_color_empty                        = (PIXVAL)contents.get_color("gui_color_empty", SYSCOL_EMPTY);
+	gui_theme_t::gui_color_chat_window_network_transparency = (PIXVAL)contents.get_color("gui_color_chat_window_network_transparency", gui_color_chat_window_network_transparency);
 
 	gui_theme_t::gui_waitingbar_width = (uint32)contents.get_int("gui_waitingbar_width", gui_theme_t::gui_waitingbar_width);
 
@@ -539,7 +543,7 @@ bool gui_theme_t::themes_init(const char *file_name, bool init_fonts, bool init_
 	env_t::window_snap_distance =      contents.get_int("window_snap_distance",      env_t::window_snap_distance );
 	gui_theme_t::gui_drop_shadows =    contents.get_int("gui_drop_shadows",          gui_theme_t::gui_drop_shadows );
 	env_t::bottom_window_darkness =    contents.get_int("bottom_window_darkness",    env_t::bottom_window_darkness );
-
+	env_t::menupos                   = contents.get_int("menubar_position",          env_t::menupos);
 	env_t::gui_player_color_bright =   contents.get_int("gui_player_color_bright",   env_t::gui_player_color_bright );
 	env_t::gui_player_color_dark =     contents.get_int("gui_player_color_dark",     env_t::gui_player_color_dark );
 
@@ -555,6 +559,8 @@ bool gui_theme_t::themes_init(const char *file_name, bool init_fonts, bool init_
 	env_t::tooltip_duration =     contents.get_int("tooltip_duration",           env_t::tooltip_duration );
 	env_t::toolbar_max_width =    contents.get_int("toolbar_max_width",          env_t::toolbar_max_width );
 	env_t::toolbar_max_height =   contents.get_int("toolbar_max_height",         env_t::toolbar_max_height );
+
+	env_t::chat_window_transparency =   100 - contents.get_int("gui_chat_window_network_transparency", 100 - env_t::chat_window_transparency);
 
 	if(  toolbar_last_used_t::last_used_tools  &&  init_tools  ) {
 		// only re-init if already inited

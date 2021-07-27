@@ -893,7 +893,7 @@ void fabrik_t::build(sint32 rotate, bool build_fields, bool force_initial_prodba
 {
 	this->rotate = rotate;
 	pos_origin = welt->lookup_kartenboden(pos_origin.get_2d())->get_pos();
-	gebaeude_t *gb = hausbauer_t::build(owner, pos_origin, rotate, desc->get_building(), this);
+	gebaeude_t *gb = hausbauer_t::build(owner, pos_origin.get_2d(), rotate, desc->get_building(), this);
 	pos = gb->get_pos();
 	pos_origin.z = pos.z;
 
@@ -2647,10 +2647,10 @@ void fabrik_t::verteile_waren(const uint32 product)
 								if(  demand < w.max  &&  w.demand_buffer >= w.max  ) {
 									fab->inactive_demands++;
 								}
-							}
 
-							// refund successful
-							break;
+								// refund successful
+								break;
+							}
 						}
 					}
 				}
@@ -2728,7 +2728,7 @@ void fabrik_t::new_month()
 // static !
 uint8 fabrik_t::status_to_color[5] = {COL_RED, COL_ORANGE, COL_GREEN, COL_YELLOW, COL_WHITE };
 
-#define FL_WARE_NULL           1
+//#define FL_WARE_NULL         1
 #define FL_WARE_ALLENULL       2
 #define FL_WARE_LIMIT          4
 #define FL_WARE_ALLELIMIT      8
@@ -2911,8 +2911,8 @@ void fabrik_t::info_prod(cbuffer_t& buf) const
 			else {
 				buf.printf("%s %u/%u%s",
 					translator::translate(type->get_name()),
-					(uint32)((FAB_DISPLAY_UNIT_HALF + (sint64)output[index].menge * pfactor) >> (fabrik_t::precision_bits + DEFAULT_PRODUCTION_FACTOR_BITS)),
-					(uint32)((FAB_DISPLAY_UNIT_HALF + (sint64)output[index].max * pfactor) >> (fabrik_t::precision_bits + DEFAULT_PRODUCTION_FACTOR_BITS)),
+					(uint32) convert_goods( (sint64)output[index].menge * pfactor),
+					(uint32) convert_goods( (sint64)output[index].max * pfactor),
 					translator::translate(type->get_mass())
 				);
 
@@ -2933,37 +2933,48 @@ void fabrik_t::info_prod(cbuffer_t& buf) const
 		for (uint32 index = 0; index < input.get_count(); index++) {
 			sint64 const pfactor = (sint64)desc->get_supplier(index)->get_consumption();
 
+			const char *cat_name = "";
+			const char *cat_seperator = "";
+			if(  input[index].get_typ()->get_catg() > 0  ) {
+				cat_name = translator::translate(input[index].get_typ()->get_catg_name());
+				cat_seperator = ", ";
+			}
+
 			buf.append("\n - ");
 			if(  welt->get_settings().get_just_in_time() >= 2  ) {
 				double const pfraction = (double)pfactor / (double)DEFAULT_PRODUCTION_FACTOR;
 				double const storage_unit = (double)(1 << fabrik_t::precision_bits);
-				buf.printf(translator::translate("%s %.0f%% : %.0f+%u/%.0f @ %.1f%%"),
+				buf.printf(translator::translate("%s %.0f%% : %.0f+%u/%.0f%s, %s%s%.1f%%"),
 					translator::translate(input[index].get_typ()->get_name()),
 					pfraction * 100.0,
 					(double)input[index].menge * pfraction / storage_unit,
 					(uint32)input[index].get_in_transit(),
 					(double)input[index].max * pfraction / storage_unit,
+					translator::translate(input[index].get_typ()->get_mass()),
+					cat_name, cat_seperator,
 					(double)input[index].calculate_demand_production_rate() * 100.0 / (double)(1 << 16)
 				);
 			}
 			else if(  welt->get_settings().get_factory_maximum_intransit_percentage()  ) {
-				buf.printf("%s %u/%i(%i)/%u%s, %u%%",
+				buf.printf("%s %u/%i(%i)/%u%s, %s%s%u%%",
 					translator::translate(input[index].get_typ()->get_name()),
-					(uint32)((FAB_DISPLAY_UNIT_HALF + (sint64)input[index].menge * pfactor) >> (fabrik_t::precision_bits + DEFAULT_PRODUCTION_FACTOR_BITS)),
+					(uint32) convert_goods( (sint64)input[index].menge * pfactor),
 					input[index].get_in_transit(),
 					input[index].max_transit,
-					(uint32)((FAB_DISPLAY_UNIT_HALF + (sint64)input[index].max * pfactor) >> (fabrik_t::precision_bits + DEFAULT_PRODUCTION_FACTOR_BITS)),
+					(uint32) convert_goods( (sint64)input[index].max * pfactor),
 					translator::translate(input[index].get_typ()->get_mass()),
+					cat_name, cat_seperator,
 					(uint32)((FAB_PRODFACT_UNIT_HALF + (sint32)pfactor * 100) >> DEFAULT_PRODUCTION_FACTOR_BITS)
 				);
 			}
 			else {
-				buf.printf("%s %u/%i/%u%s, %u%%",
+				buf.printf("%s %u/%i/%u%s, %s%s%u%%",
 					translator::translate(input[index].get_typ()->get_name()),
-					(uint32)((FAB_DISPLAY_UNIT_HALF + (sint64)input[index].menge * pfactor) >> (fabrik_t::precision_bits + DEFAULT_PRODUCTION_FACTOR_BITS)),
+					(uint32) convert_goods( (sint64)input[index].menge * pfactor),
 					input[index].get_in_transit(),
-					(uint32)((FAB_DISPLAY_UNIT_HALF + (sint64)input[index].max * pfactor) >> (fabrik_t::precision_bits + DEFAULT_PRODUCTION_FACTOR_BITS)),
+					(uint32) convert_goods( (sint64)input[index].max * pfactor),
 					translator::translate(input[index].get_typ()->get_mass()),
+					cat_name, cat_seperator,
 					(uint32)((FAB_PRODFACT_UNIT_HALF + (sint32)pfactor * 100) >> DEFAULT_PRODUCTION_FACTOR_BITS)
 				);
 			}

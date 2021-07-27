@@ -81,8 +81,13 @@ static const bool cost_type_money[ MAX_LINE_COST ] =
 	false
 };
 
+// which buttons as defualt in statistic
+static bool cost_type_default[MAX_LINE_COST] = { 0,0,0,0,0,0,0,0,0 };
 
-line_management_gui_t::line_management_gui_t( linehandle_t line_, player_t* player_ ) :
+// statistics as first default to open
+static int default_opening_tab = 1;
+
+line_management_gui_t::line_management_gui_t( linehandle_t line_, player_t* player_, int active_tab) :
 	gui_frame_t( translator::translate( "Fahrplan" ), player_ ),
 	scrolly_convois( gui_scrolled_list_t::windowskin ),
 	scrolly_halts( gui_scrolled_list_t::windowskin ),
@@ -159,6 +164,11 @@ line_management_gui_t::line_management_gui_t( linehandle_t line_, player_t* play
 	scrolly_halts.set_maximize( true );
 	container_halts.add_component(&scrolly_halts);
 
+	if (active_tab < 0) {
+		active_tab = default_opening_tab;
+	}
+	switch_mode.set_active_tab_index(active_tab);
+
 	if (line.is_bound() ) {
 		init();
 	}
@@ -187,12 +197,13 @@ void line_management_gui_t::init()
 		if( chart.get_curve_count() == 0 ) {
 			container_stats.add_table( 4, 3 )->set_force_equal_columns( true );
 			for( int cost = 0; cost < MAX_LINE_COST; cost++ ) {
-				uint16 curve = chart.add_curve( color_idx_to_rgb( cost_type_color[ cost ] ), line->get_finance_history(), MAX_LINE_COST, idx2cost[cost], MAX_MONTHS, cost_type_money[ cost ], false, true, cost_type_money[ cost ] * 2 );
+				uint16 curve = chart.add_curve( color_idx_to_rgb( cost_type_color[ cost ] ), line->get_finance_history(), MAX_LINE_COST, idx2cost[cost], MAX_MONTHS, cost_type_money[ cost ], cost_type_default[cost], true, cost_type_money[ cost ] * 2 );
 
 				button_t *b = container_stats.new_component<button_t>();
 				b->init( button_t::box_state_automatic | button_t::flexible, cost_type[ cost ] );
 				b->background_color = color_idx_to_rgb( cost_type_color[ cost ] );
-				b->pressed = false;
+				b->pressed = cost_type_default[cost];
+				b->add_listener( this );
 
 				button_to_chart.append( b, &chart, curve );
 			}
@@ -209,9 +220,16 @@ void line_management_gui_t::draw(scr_coord pos, scr_size size)
 {
 	if(  line.is_bound()  ) {
 
-		bool is_change_allowed = player == welt->get_active_player()  &&  !welt->get_active_player()->is_locked();
+		player_t *ap = welt->get_active_player();
+		bool is_change_allowed = player == ap  &&  !welt->get_active_player()->is_locked();
 
 		bool has_changed = false; // then we need to recalc sizes ...
+
+		if (!is_change_allowed) {
+			bt_delete_line.enable(false);
+		}
+		bt_withdraw_line.enable(is_change_allowed);
+		bt_find_convois.enable(is_change_allowed);
 
 		if(  line->count_convoys() != old_convoi_count  ) {
 
@@ -230,8 +248,9 @@ void line_management_gui_t::draw(scr_coord pos, scr_size size)
 					break;
 			}
 
-			bt_withdraw_line.enable( old_convoi_count != 0 );
-			// fill convoi container
+			bt_withdraw_line.enable(is_change_allowed  &&  old_convoi_count != 0 );
+
+				// fill convoi container
 			scrolly_convois.clear_elements();
 			for( uint32 i = 0; i < line->count_convoys(); i++ ) {
 				convoihandle_t cnv = line->get_convoy( i );
@@ -396,6 +415,7 @@ bool line_management_gui_t::action_triggered( gui_action_creator_t *comp, value_
 			reset_min_windowsize();
 		}
 		else {
+			default_opening_tab = v.i;
 			scd.highlight_schedule( false );
 			apply_schedule();
 		}
@@ -438,6 +458,15 @@ bool line_management_gui_t::action_triggered( gui_action_creator_t *comp, value_
 						cnv->call_convoi_tool('l', id);
 					}
 				}
+			}
+		}
+	}
+	else {
+		const vector_tpl<gui_button_to_chart_t*> &l = button_to_chart.list();
+		for( uint32 i = 0; i<l.get_count(); i++ ) {
+			if( comp == l[i]->get_button() ) {
+				cost_type_default[i] = l[i]->get_button()->pressed;
+				break;
 			}
 		}
 	}
