@@ -116,6 +116,7 @@ const char *tool_t::id_to_string(uint16 id)
 		CASE_TO_STRING(TOOL_EXEC_TWO_CLICK_SCRIPT);
 		CASE_TO_STRING(TOOL_PLANT_GROUNDOBJ);
 		CASE_TO_STRING(TOOL_ADD_MESSAGE);
+		CASE_TO_STRING(TOOL_CHANGE_CITY_OF_CITYBUILDING);
 		}
 	}
 	else if (id & SIMPLE_TOOL) {
@@ -268,6 +269,7 @@ tool_t *create_general_tool(int toolnr)
 		case TOOL_EXEC_TWO_CLICK_SCRIPT:       tool = new tool_exec_two_click_script_t(); break;
 		case TOOL_PLANT_GROUNDOBJ:             tool = new tool_plant_groundobj_t();     break;
 		case TOOL_ADD_MESSAGE:                 tool = new tool_add_message_t();         break;
+		case TOOL_CHANGE_CITY_OF_CITYBUILDING: tool = new tool_change_city_of_citybuilding_t(); break;
 		default:
 			dbg->error("create_general_tool()","cannot satisfy request for general_tool[%i]!",toolnr);
 			return NULL;
