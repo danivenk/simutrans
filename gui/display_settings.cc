@@ -52,9 +52,6 @@ enum {
 	IDBTN_INFINITE_SCROLL,
 	IDBTN_RIBI_ARROW,
 	IDBTN_ONEWAY_RIBI_ONLY,
-	IDBTN_INFINITE_SCROLL,
-	COLORS_MAX_BUTTONS
-	IDBTN_INFINITE_SCROLL,
 	COLORS_MAX_BUTTONS
 };
 
@@ -89,14 +86,10 @@ public:
 
 gui_settings_t::gui_settings_t()
 {
-	set_table_layout( 3, 0 );
-
-	set_table_layout( 3, 0 );
-
+	set_table_layout( 1, 0 );
 	// Show thememanager
 	buttons[ IDBTN_SHOW_THEMEMANAGER ].init( button_t::roundbox_state | button_t::flexible, "Select a theme for display" );
-	add_component( buttons + IDBTN_SHOW_THEMEMANAGER, 3 );
-	add_component( buttons + IDBTN_SHOW_THEMEMANAGER, 3 );
+	add_component( buttons + IDBTN_SHOW_THEMEMANAGER );
 
 	// Change font
 	buttons[ IDBTN_CHANGE_FONT ].init( button_t::roundbox_state | button_t::flexible, "Select display font" );
@@ -130,49 +123,41 @@ gui_settings_t::gui_settings_t()
 		case MENU_BOTTOM: toolbar_pos.init(button_t::arrowdown, NULL); break;
 		case MENU_RIGHT: toolbar_pos.init(button_t::arrowright, NULL); break;
 	}
-	add_component(&toolbar_pos, 2 );
-	add_component(&toolbar_pos, 2 );
+	add_component(&toolbar_pos);
 
 	fullscreen.init( button_t::square_state, "Fullscreen (changed after restart)" );
 	fullscreen.pressed = ( dr_get_fullscreen() == FULLSCREEN );
 	fullscreen.enable(dr_has_fullscreen());
-	add_component( &fullscreen, 3 );
-	add_component( &fullscreen, 3 );
+	add_component( &fullscreen, 2 );
 
 	borderless.init( button_t::square_state, "Borderless (disabled on fullscreen)" );
 	borderless.enable ( dr_get_fullscreen() != FULLSCREEN );
 	borderless.pressed = ( dr_get_fullscreen() == BORDERLESS );
-	add_component( &borderless, 3 );
-	add_component( &borderless, 3 );
+	add_component( &borderless, 2 );
 
 	reselect_closes_tool.init( button_t::square_state, "Reselect closes tools" );
 	reselect_closes_tool.pressed = env_t::reselect_closes_tool;
-	add_component( &reselect_closes_tool, 3 );
-	add_component( &reselect_closes_tool, 3 );
+	add_component( &reselect_closes_tool, 2 );
 	
 	put_below_others.init( button_t::square_state, "Put new toolbar below others" );
 	put_below_others.pressed = env_t::put_new_toolbar_below_others;
-	add_component( &put_below_others, 3 );
-	add_component( &put_below_others, 3 );
+	add_component( &put_below_others, 2 );
 
 	// Frame time label
 	new_component<gui_label_t>("Frame time:");
 	frame_time_value_label.buf().printf(" 9999 ms");
 	frame_time_value_label.update();
-	add_component( &frame_time_value_label, 2 );
-	add_component( &frame_time_value_label, 2 );
+	add_component( &frame_time_value_label );
 	// Idle time label
 	new_component<gui_label_t>("Idle:");
 	idle_time_value_label.buf().printf(" 9999 ms");
 	idle_time_value_label.update();
-	add_component( &idle_time_value_label, 2 );
-	add_component( &idle_time_value_label, 2 );
+	add_component( &idle_time_value_label );
 	// FPS label
 	new_component<gui_label_t>("FPS:");
 	fps_value_label.buf().printf(" 99.9 fps");
 	fps_value_label.update();
-	add_component( &fps_value_label, 2 );
-	add_component( &fps_value_label, 2 );
+	add_component( &fps_value_label );
 	// Simloops label
 	new_component<gui_label_t>("Sim:");
 	simloops_value_label.buf().printf(" 999.9");
@@ -218,19 +203,24 @@ void gui_settings_t::draw(scr_coord offset)
 	gui_aligned_container_t::draw(offset);
 }
 
+
 bool gui_settings_t::action_triggered(gui_action_creator_t *comp, value_t)
 {
 	if (comp == &screen_scale_numinp) {
 		const sint16 new_value = screen_scale_numinp.get_value();
+		env_t::display_scale_percent = new_value;
 		dr_set_screen_scale(new_value);
 	}
 	else if (comp == &screen_scale_auto) {
 		dr_set_screen_scale(-1);
-		screen_scale_numinp.set_value(dr_get_screen_scale());
+		const sint16 screen_scale = dr_get_screen_scale();
+		env_t::display_scale_percent = screen_scale;
+		screen_scale_numinp.set_value(screen_scale);
 	}
 
 	return true;
 }
+
 
 map_settings_t::map_settings_t()
 {
@@ -286,14 +276,6 @@ map_settings_t::map_settings_t()
 	buttons[IDBTN_INFINITE_SCROLL].set_tooltip("Infinite scrolling using mouse");
 	add_component(buttons + IDBTN_INFINITE_SCROLL, 2);
 
-
-	// scroll with genral tool selected if moved above a threshold
-	new_component<gui_label_t>("Scroll threshold");
-
-	scroll_threshold.init(env_t::scroll_threshold, 1, 64, 1, false);
-	scroll_threshold.add_listener(this);
-	add_component(&scroll_threshold);
-
 	// Scroll speed label
 	new_component<gui_label_t>( "3LIGHT_CHOOSE" );
 
@@ -329,16 +311,6 @@ bool map_settings_t::action_triggered( gui_action_creator_t *comp, value_t v )
 	// Brightness edit
 	if( &brightness == comp ) {
 		env_t::daynight_level = (sint8)v.i;
-	}
-	// Scroll speed edit
-	else if (&scroll_threshold == comp) {
-		env_t::scroll_threshold = v.i;
-	}
-	// Scroll speed edit
-	else if (&scrollspeed == comp) {
-		env_t::scroll_multi = (sint16)(buttons[IDBTN_SCROLL_INVERSE].pressed ? -v.i : v.i);
-	else if (&scroll_threshold == comp) {
-		env_t::scroll_threshold = v.i;
 	}
 	// Scroll speed edit
 	else if (&scrollspeed == comp) {
