@@ -36,3 +36,4 @@ revision.h
 *.d
 *.res
 .vscode/
+sim-*.exe
