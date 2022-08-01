@@ -303,8 +303,6 @@ bool interaction_t::process_event( event_t &ev )
 
 	// Handle map drag with right-click
 
-	static bool is_world_dragging = false;
-
 	if(IS_RIGHTCLICK(&ev)) {
 		display_show_pointer(false);
 	}
@@ -385,10 +383,11 @@ void interaction_t::check_events()
 }
 
 
-interaction_t::interaction_t()
+interaction_t::interaction_t() :
+	is_dragging(false),
+	is_world_dragging(false)
 {
 	viewport = world->get_viewport();
-	is_dragging = false;
 
 	// Requires a world with a view already attached!
 	assert(viewport);
