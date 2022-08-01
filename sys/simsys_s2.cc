@@ -431,8 +431,8 @@ int dr_os_open(const scr_size window_size, sint16 fs)
 {
 	// scale up
 	resolution res = dr_query_screen_resolution();
-	const int tex_w = clamp( res.w, 1, SCREEN_TO_TEX_X(window_size.w) );
-	const int tex_h = clamp( res.h, 1, SCREEN_TO_TEX_Y(window_size.h) );
+	const int tex_w = clamp( res.w, 1, SCREEN_TO_TEX_X(screen_width) );
+	const int tex_h = clamp( res.h, 1, SCREEN_TO_TEX_Y(screen_height) );
 
 	DBG_MESSAGE("dr_os_open()", "Screen requested %i,%i, available max %i,%i", tex_w, tex_h, res.w, res.h);
 

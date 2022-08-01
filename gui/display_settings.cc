@@ -49,8 +49,11 @@ enum {
 	IDBTN_SHOW_THEMEMANAGER,
 	IDBTN_SIMPLE_DRAWING,
 	IDBTN_CHANGE_FONT,
+	IDBTN_INFINITE_SCROLL,
 	IDBTN_RIBI_ARROW,
 	IDBTN_ONEWAY_RIBI_ONLY,
+	IDBTN_INFINITE_SCROLL,
+	COLORS_MAX_BUTTONS
 	IDBTN_INFINITE_SCROLL,
 	COLORS_MAX_BUTTONS
 };
@@ -88,20 +91,24 @@ gui_settings_t::gui_settings_t()
 {
 	set_table_layout( 3, 0 );
 
+	set_table_layout( 3, 0 );
+
 	// Show thememanager
 	buttons[ IDBTN_SHOW_THEMEMANAGER ].init( button_t::roundbox_state | button_t::flexible, "Select a theme for display" );
+	add_component( buttons + IDBTN_SHOW_THEMEMANAGER, 3 );
 	add_component( buttons + IDBTN_SHOW_THEMEMANAGER, 3 );
 
 	// Change font
 	buttons[ IDBTN_CHANGE_FONT ].init( button_t::roundbox_state | button_t::flexible, "Select display font" );
-	add_component( buttons + IDBTN_CHANGE_FONT, 3 );
+	add_component( buttons + IDBTN_CHANGE_FONT );
 
 	// screen scale number input
-	new_component<gui_label_t>("Screen scale: ");
-
-	add_table(2,0);
+	add_table(3, 0);
+	set_alignment(ALIGN_LEFT);
 	{
-		screen_scale_numinp.init(dr_get_screen_scale(), 25, 400, 25, false);
+		new_component<gui_label_t>("Screen scale: ");
+
+		screen_scale_numinp.init(dr_get_screen_scale(), 25, 400, 25);
 		screen_scale_numinp.add_listener(this);
 		add_component(&screen_scale_numinp);
 
@@ -110,8 +117,10 @@ gui_settings_t::gui_settings_t()
 		add_component(&screen_scale_auto);
 	}
 	end_table();
-
-	new_component<gui_fill_t>();
+	
+	// add controls to info container
+	add_table(2,5);
+	set_alignment(ALIGN_LEFT);
 
 	// position of menu
 	new_component<gui_label_t>("Toolbar position:");
@@ -122,23 +131,28 @@ gui_settings_t::gui_settings_t()
 		case MENU_RIGHT: toolbar_pos.init(button_t::arrowright, NULL); break;
 	}
 	add_component(&toolbar_pos, 2 );
+	add_component(&toolbar_pos, 2 );
 
 	fullscreen.init( button_t::square_state, "Fullscreen (changed after restart)" );
 	fullscreen.pressed = ( dr_get_fullscreen() == FULLSCREEN );
 	fullscreen.enable(dr_has_fullscreen());
+	add_component( &fullscreen, 3 );
 	add_component( &fullscreen, 3 );
 
 	borderless.init( button_t::square_state, "Borderless (disabled on fullscreen)" );
 	borderless.enable ( dr_get_fullscreen() != FULLSCREEN );
 	borderless.pressed = ( dr_get_fullscreen() == BORDERLESS );
 	add_component( &borderless, 3 );
+	add_component( &borderless, 3 );
 
 	reselect_closes_tool.init( button_t::square_state, "Reselect closes tools" );
 	reselect_closes_tool.pressed = env_t::reselect_closes_tool;
 	add_component( &reselect_closes_tool, 3 );
+	add_component( &reselect_closes_tool, 3 );
 	
 	put_below_others.init( button_t::square_state, "Put new toolbar below others" );
 	put_below_others.pressed = env_t::put_new_toolbar_below_others;
+	add_component( &put_below_others, 3 );
 	add_component( &put_below_others, 3 );
 
 	// Frame time label
@@ -146,21 +160,24 @@ gui_settings_t::gui_settings_t()
 	frame_time_value_label.buf().printf(" 9999 ms");
 	frame_time_value_label.update();
 	add_component( &frame_time_value_label, 2 );
+	add_component( &frame_time_value_label, 2 );
 	// Idle time label
 	new_component<gui_label_t>("Idle:");
 	idle_time_value_label.buf().printf(" 9999 ms");
 	idle_time_value_label.update();
+	add_component( &idle_time_value_label, 2 );
 	add_component( &idle_time_value_label, 2 );
 	// FPS label
 	new_component<gui_label_t>("FPS:");
 	fps_value_label.buf().printf(" 99.9 fps");
 	fps_value_label.update();
 	add_component( &fps_value_label, 2 );
+	add_component( &fps_value_label, 2 );
 	// Simloops label
 	new_component<gui_label_t>("Sim:");
 	simloops_value_label.buf().printf(" 999.9");
 	simloops_value_label.update();
-	add_component( &simloops_value_label, 2 );
+	add_component( &simloops_value_label );
 }
 
 void gui_settings_t::draw(scr_coord offset)
@@ -217,8 +234,8 @@ bool gui_settings_t::action_triggered(gui_action_creator_t *comp, value_t)
 
 map_settings_t::map_settings_t()
 {
-	set_table_layout( 1, 0 );
-	add_table( 2, 0 );
+	set_table_layout( 2, 0 );
+
 	// Show grid checkbox
 	buttons[ IDBTN_SHOW_GRID ].init( button_t::square_state, "show grid" );
 	add_component( buttons + IDBTN_SHOW_GRID, 2 );
@@ -255,6 +272,11 @@ map_settings_t::map_settings_t()
 	buttons[IDBTN_IGNORE_NUMLOCK].pressed = env_t::numpad_always_moves_map;
 	add_component(buttons + IDBTN_IGNORE_NUMLOCK, 2);
 
+	// Numpad key
+	buttons[IDBTN_IGNORE_NUMLOCK].init(button_t::square_state, "Num pad keys always move map");
+	buttons[IDBTN_IGNORE_NUMLOCK].pressed = env_t::numpad_always_moves_map;
+	add_component(buttons + IDBTN_IGNORE_NUMLOCK, 2);
+
 	// Scroll inverse checkbox
 	buttons[IDBTN_SCROLL_INVERSE].init(button_t::square_state, "4LIGHT_CHOOSE");
 	add_component(buttons + IDBTN_SCROLL_INVERSE, 2);
@@ -263,6 +285,7 @@ map_settings_t::map_settings_t()
 	buttons[IDBTN_INFINITE_SCROLL].init(button_t::square_state, "Infinite mouse scrolling");
 	buttons[IDBTN_INFINITE_SCROLL].set_tooltip("Infinite scrolling using mouse");
 	add_component(buttons + IDBTN_INFINITE_SCROLL, 2);
+
 
 	// scroll with genral tool selected if moved above a threshold
 	new_component<gui_label_t>("Scroll threshold");
@@ -299,8 +322,6 @@ map_settings_t::map_settings_t()
 	time_setting.set_selection( old_show_month );
 	add_component( &time_setting );
 	time_setting.add_listener( this );
-
-	end_table();
 }
 
 bool map_settings_t::action_triggered( gui_action_creator_t *comp, value_t v )
@@ -310,6 +331,12 @@ bool map_settings_t::action_triggered( gui_action_creator_t *comp, value_t v )
 		env_t::daynight_level = (sint8)v.i;
 	}
 	// Scroll speed edit
+	else if (&scroll_threshold == comp) {
+		env_t::scroll_threshold = v.i;
+	}
+	// Scroll speed edit
+	else if (&scrollspeed == comp) {
+		env_t::scroll_multi = (sint16)(buttons[IDBTN_SCROLL_INVERSE].pressed ? -v.i : v.i);
 	else if (&scroll_threshold == comp) {
 		env_t::scroll_threshold = v.i;
 	}
@@ -335,8 +362,7 @@ bool map_settings_t::action_triggered( gui_action_creator_t *comp, value_t v )
 
 transparency_settings_t::transparency_settings_t()
 {
-	set_table_layout( 1, 0 );
-	add_table( 2, 0 );
+	set_table_layout( 2, 0 );
 
 	// Transparent instead of hidden checkbox
 	buttons[ IDBTN_TRANSPARENT_INSTEAD_OF_HIDDEN ].init( button_t::square_state, "hide transparent" );
@@ -374,8 +400,6 @@ transparency_settings_t::transparency_settings_t()
 	factory_tooltip.set_selection( env_t::show_factory_storage_bar );
 	add_component( &factory_tooltip );
 	factory_tooltip.add_listener( this );
-
-	end_table();
 }
 
 bool transparency_settings_t::action_triggered( gui_action_creator_t *comp, value_t v )
@@ -409,8 +433,7 @@ void transparency_settings_t::draw( scr_coord offset )
 
 station_settings_t::station_settings_t()
 {
-	set_table_layout( 1, 0 );
-	add_table( 2, 0 );
+	set_table_layout( 2, 0 );
 
 	// Transparent station coverage
 	buttons[ IDBTN_TRANSPARENT_STATION_COVERAGE ].init( button_t::square_state, "transparent station coverage" );
@@ -436,14 +459,11 @@ station_settings_t::station_settings_t()
 	buttons[ IDBTN_SHOW_WAITING_BARS ].init( button_t::square_state, "show waiting bars" );
 	buttons[ IDBTN_SHOW_WAITING_BARS ].pressed = env_t::show_names & 2;
 	add_component( buttons + IDBTN_SHOW_WAITING_BARS, 2 );
-
-	end_table();
 }
 
 traffic_settings_t::traffic_settings_t()
 {
-	set_table_layout( 1, 0 );
-	add_table( 2, 0 );
+	set_table_layout( 2, 0 );
 
 	// Pedestrians in towns checkbox
 	buttons[IDBTN_PEDESTRIANS_IN_TOWNS].init(button_t::square_state, "6LIGHT_CHOOSE");
@@ -505,8 +525,6 @@ traffic_settings_t::traffic_settings_t()
 	buttons[IDBTN_ONEWAY_RIBI_ONLY].init(button_t::square_state, "show directions only for oneway roads");
 	buttons[IDBTN_ONEWAY_RIBI_ONLY].pressed = env_t::show_oneway_ribi_only;
 	add_component(buttons+IDBTN_ONEWAY_RIBI_ONLY, 2);
-
-	end_table();
 }
 
 bool traffic_settings_t::action_triggered( gui_action_creator_t *comp, value_t v )
@@ -641,6 +659,9 @@ bool color_gui_t::action_triggered( gui_action_creator_t *comp, value_t p)
 	case IDBTN_INFINITE_SCROLL:
 		env_t::scroll_infinite ^= 1;
 		break;
+	case IDBTN_INFINITE_SCROLL:
+		env_t::scroll_infinite ^= 1;
+		break;
 	case IDBTN_PEDESTRIANS_AT_STOPS:
 		if( !env_t::networkmode || welt->get_active_player_nr() == PUBLIC_PLAYER_NR ) {
 			welt->set_tool( tool_t::simple_tool[ TOOL_TOOGLE_PAX & 0xFFF ], welt->get_active_player() );
@@ -757,6 +778,7 @@ void color_gui_t::draw(scr_coord pos, scr_size size)
 	buttons[IDBTN_SIMPLE_DRAWING].pressed = env_t::simple_drawing;
 	buttons[IDBTN_SIMPLE_DRAWING].enable(welt->is_paused());
 	buttons[IDBTN_SCROLL_INVERSE].pressed = env_t::scroll_multi < 0;
+	buttons[IDBTN_INFINITE_SCROLL].pressed = env_t::scroll_infinite;
 	buttons[IDBTN_INFINITE_SCROLL].pressed = env_t::scroll_infinite;
 	buttons[IDBTN_DAY_NIGHT_CHANGE].pressed = env_t::night_shift;
 	buttons[IDBTN_SHOW_SLICE_MAP_VIEW].pressed = grund_t::underground_mode == grund_t::ugm_level;

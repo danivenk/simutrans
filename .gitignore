@@ -35,5 +35,6 @@ revision.h
 .idea
 *.d
 *.res
+.DS_Store
 .vscode/
 sim-*.exe

@@ -19,8 +19,10 @@
 void rdwr_win_settings(loadsave_t *file); // simwin
 
 
+
 sint16 env_t::menupos = MENU_TOP;
 sint16 env_t::fullscreen = WINDOWED;
+sint16 env_t::display_scale_percent = 100;
 sint16 env_t::display_scale_percent = 100;
 bool env_t::reselect_closes_tool = true;
 
@@ -79,7 +81,6 @@ std::string env_t::nickname = "";
 const char *env_t::language_iso = "en";
 sint16 env_t::scroll_multi = -1; // start with same scrool as mouse as nowadays standard
 bool env_t::scroll_infinite = false; // since it fails with touch devices
-uint16 env_t::scroll_threshold = 8;
 sint16 env_t::global_volume = 127;
 uint32 env_t::sound_distance_scaling;
 sint16 env_t::midi_volume = 127;
@@ -235,7 +236,6 @@ void env_t::init()
 	cursor_hide_range = 5;
 
 	scroll_infinite = false;
-	scroll_threshold = 16;
 
 	highlight_city = false;
 	highlighted_city = NULL;
@@ -618,16 +618,13 @@ void env_t::rdwr(loadsave_t *file)
 
 		file->rdwr_short( fullscreen );
 	}
-
-	if( file->is_version_atleast(123, 1) ) {
-		file->rdwr_short(display_scale_percent);
+	if (file->get_OTRP_version()>=33) {
 		file->rdwr_bool(scroll_infinite);
 	}
 
-	if (file->is_version_atleast(123, 2)) {
-		file->rdwr_short(scroll_threshold);
+	if(  file->is_version_atleast(123, 1)  ||  file->get_OTRP_version()>=33  ) {
+		file->rdwr_short(display_scale_percent);
 	}
-
 
 	// server settings are not saved, since they are server specific
 	// and could be different on different servers on the same computers
