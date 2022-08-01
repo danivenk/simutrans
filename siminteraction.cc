@@ -317,7 +317,7 @@ bool interaction_t::process_event( event_t &ev )
 		catch_dragging();
 		move_view(ev);
 	}
-	else if ((left_drag || (world->get_tool(world->get_active_player_nr())->get_id() & GENERAL_TOOL) != 0) && IS_LEFTDRAG(&ev)) {
+	else if(  IS_LEFTDRAG(&ev)  &&  IS_LEFT_BUTTON_PRESSED(&ev)  &&  (left_drag  ||  !world->get_tool(world->get_active_player_nr())->move_has_effects())  ) {
 		/* ok, we have a general tool selected, and we have a left drag or left release event with an actual difference
 		 * => move the map, if we are beyond a threshold */
 		if(  left_drag  ||  abs(ev.cx-ev.mx)+abs(ev.cy-ev.my)>=env_t::scroll_threshold  ) {
@@ -332,7 +332,7 @@ bool interaction_t::process_event( event_t &ev )
 		}
 	}
 
-	if(  IS_LEFTRELEASE(&ev)  &&  left_drag  ) {
+	if( !IS_LEFT_BUTTON_PRESSED(&ev)  &&  left_drag  ) {
 		// show the mouse and swallow this event if we were dragging before
 		ev.ev_code = IGNORE_EVENT;
 		display_show_pointer(true);
