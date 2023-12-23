@@ -4,7 +4,7 @@
  */
 
 #include <stdio.h>
-#include <cmath>
+#include <time.h>
 
 #include "../simdebug.h"
 #include "../gui/simwin.h"
@@ -23,6 +23,7 @@
 #include "../simdepot.h"
 #include "loadsave.h"
 #include "translator.h"
+#include "../utils/simrandom.h"
 
 #include "schedule.h"
 
@@ -48,6 +49,7 @@ void schedule_t::copy_from(const schedule_t *src)
 	editing_finished = src->is_editing_finished();
 	flags = src->get_flags();
 	max_speed = src->get_max_speed();
+	departure_slot_group_id = src->get_departure_slot_group_id();
 }
 
 
@@ -225,6 +227,12 @@ void schedule_t::rdwr(loadsave_t *file)
 		file->rdwr_short(max_speed);
 	} else {
 		max_speed = 0;
+	}
+
+	if(  file->get_OTRP_version()>=34  ) {
+		file->rdwr_longlong(departure_slot_group_id);
+	} else {
+		departure_slot_group_id = issue_new_departure_slot_group_id();
 	}
 
 	if(file->is_version_less(99, 12)) {
@@ -442,7 +450,7 @@ void schedule_t::add_return_way()
 void schedule_t::sprintf_schedule( cbuffer_t &buf ) const
 {
 	uint32 s = current_stop + (flags<<8) + (max_speed<<16);
-	buf.printf("%u|%d|", s, (int)get_type());
+	buf.printf("%u|%ld|%d|", s, departure_slot_group_id, (int)get_type());
 	FOR(minivec_tpl<schedule_entry_t>, const& i, entries) {
 		buf.printf("%s,%i,%i,%i,%i,%i,%i|", i.pos.get_str(), (int)i.minimum_loading, (int)i.waiting_time_shift, i.get_stop_flags(), i.spacing, i.spacing_shift, i.delay_tolerance);
 	}
@@ -469,7 +477,17 @@ bool schedule_t::sscanf_schedule( const char *ptr )
 		p++;
 	}
 	if(  *p!='|'  ) {
-		dbg->error( "schedule_t::sscanf_schedule()","incomplete entry termination!" );
+		dbg->error( "schedule_t::sscanf_schedule()","incomplete entry termination for current_stop!" );
+		return false;
+	}
+	p++;
+	// then departure_slot_group_id
+	departure_slot_group_id = atoll( p );
+	while(  *p  &&  *p!='|'  ) {
+		p++;
+	}
+	if(  *p!='|'  ) {
+		dbg->error( "schedule_t::sscanf_schedule()","incomplete entry termination for departure_slot_group_id!" );
 		return false;
 	}
 	p++;
@@ -693,4 +711,23 @@ void schedule_t::get_schedule_flag_text(cbuffer_t& buf, schedule_t* schedule)
 		str[cnt+2] = '\0';
 		buf.append(str);
 	}
+}
+
+void schedule_t::set_new_departure_slot_group_id() {
+	departure_slot_group_id = issue_new_departure_slot_group_id();
+}
+
+
+static uint32 departure_slot_group_id_random = 12345678 + (uint32)time( NULL );
+
+
+sint64 schedule_t::issue_new_departure_slot_group_id() {
+	// issue_new_departure_slot_group_id() has to have its own random number generator
+	// because this function is called only on local machine in network games.
+	// Using simrand() here results in a desync.
+	departure_slot_group_id_random *= 3141592621u;
+	const uint32 num_1 = ++departure_slot_group_id_random;
+	departure_slot_group_id_random *= 3141592621u;
+	const sint64 num_2 = ++departure_slot_group_id_random;
+	return ((num_2 & 0x7FFFFFFF) << 32) | num_1;
 }
