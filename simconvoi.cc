@@ -2267,8 +2267,23 @@ bool convoi_t::can_go_alte_richtung()
 			for(i=0; i<inspecting->get_vehicle_count(); i++) {
 				vehicle_t* v = inspecting->get_vehikel(i);
 				// eventually add current position to the route
-				if (route.front() != v->get_pos() && route.at(1) != v->get_pos()) {
-					route.insert(v->get_pos());
+				// fill the tiles between route.front() and v->get_pos()
+				while (route.front() != v->get_pos() && route.at(1) != v->get_pos()) {
+					const grund_t* g = welt->lookup(route.front());
+					const weg_t* w = g ? g->get_weg(front()->get_waytype()) : NULL;
+					ribi_t::ribi dir = w ? w->get_ribi_unmasked() : ribi_t::none;
+					// find the direction to add to the route.
+					dir &= ~ribi_type(route.at(1) - route.front());
+					// If something went wrong in finding the adjacent tile, just insert the vehicle's pos.
+					koord3d pos_to_insert = v->get_pos();
+					if(  ribi_t::is_single(dir)  ) {
+						grund_t* gn;
+						g->get_neighbour(gn, front()->get_waytype(), dir);
+						if(  gn  ) {
+							pos_to_insert = gn->get_pos();
+						}
+					}
+					route.insert(pos_to_insert);
 				}
 			}
 			inspecting = inspecting->get_coupling_convoi();
@@ -2301,7 +2316,14 @@ bool convoi_t::can_go_alte_richtung()
 
 					// check direction
 					uint8 richtung = v->get_direction();
-					uint8 neu_richtung = v->calc_direction( route.at(max(idx-1,0)), v->get_pos_next());
+					koord3d vehicle_prev_pos;
+					if(  idx==0  ) {
+						const koord3d estimated_prev_pos = route.opposite_pos_of_route_starting(v->get_waytype());
+						vehicle_prev_pos = estimated_prev_pos==koord3d::invalid ? route.at(0) : estimated_prev_pos;
+					} else {
+						vehicle_prev_pos = route.at(idx-1);
+					}
+					uint8 neu_richtung = v->calc_direction( vehicle_prev_pos, v->get_pos_next());
 					// we need to move to this place ...
 					if(neu_richtung!=richtung  &&  (i!=0  ||  anz_vehikel==1  ||  ribi_t::is_bend(neu_richtung)) ) {
 						// 90 deg bend!
@@ -2876,7 +2898,10 @@ void convoi_t::rdwr(loadsave_t *file)
 	}
 
 	// waiting time left ...
-	if(file->is_version_atleast(99, 17)) {
+	if(  file->get_OTRP_version()>=35  ) {
+		file->rdwr_long(arrived_time);
+	}
+	else if(file->is_version_atleast(99, 17)) {
 		if(file->is_saving()) {
 			if(  has_schedule  &&  schedule->get_current_entry().waiting_time_shift > 0  ) {
 				uint32 diff_ticks = arrived_time + welt->ticks_per_world_month / schedule->get_current_entry().waiting_time_shift - welt->get_ticks();
@@ -3335,64 +3360,81 @@ bool can_depart(convoihandle_t cnv, halthandle_t halt, uint32 arrived_time, uint
 }
 
 
+uint32 convoi_t::calc_available_halt_length_in_vehicle_steps(koord3d front_vehicle_pos, ribi_t::ribi front_vehicle_dir, const waytype_t waytype) {
+	if(waytype == water_wt) {
+		// harbour and river stop load any size
+		return UINT_MAX;
+	}
+	// calculate the halt length in the unit whose 512 is one straight tile length.
+	const uint32 straight_tile_length = VEHICLE_STEPS_PER_TILE << 1;
+	const uint32 diagonal_tile_length = vehicle_base_t::diagonal_vehicle_steps_per_tile << 1;
+	// When the front or back tile is diagonal, we can use only half of its length as a stop.
+	const uint32 half_diagonal_tile_length = vehicle_base_t::diagonal_vehicle_steps_per_tile;
+	
+	// find out how many steps I am already in the station
+	uint32 halt_length = 0;
+	grund_t* gr = world()->lookup(front_vehicle_pos);
+	const halthandle_t halt = gr ? gr->get_halt() : halthandle_t();
+	if(  !halt.is_bound()  ) {
+		// We are not on the valid halt tiles?
+		return 0;
+	}
+	const weg_t* way_first = gr->get_weg(waytype);
+	const ribi_t::ribi way_dir_first = way_first->get_ribi_unmasked();
+	halt_length += ribi_t::is_bend(way_dir_first) ? half_diagonal_tile_length : straight_tile_length;
+	// find the direction which the vehicle did not come from.
+	ribi_t::ribi open_dir = way_dir_first & ~front_vehicle_dir;
+	if(  ribi_t::is_bend(open_dir)  ) {
+		// try to determine the single direction. prefer backward.
+		open_dir &= ribi_t::backward(front_vehicle_dir);
+	}
+	if(  !ribi_t::is_single(open_dir)  ||  !gr->get_neighbour(gr, waytype, open_dir)  ) {
+		gr = NULL;
+	}
+	
+	bool is_last_diagonal = false;
+	while(  gr  &&  haltestelle_t::get_halt(gr->get_pos(), NULL)==halt  ) {
+		const weg_t* way = gr->get_weg(waytype);
+		if(  !way  ) { break; }
+		const ribi_t::ribi way_dir = way->get_ribi_unmasked();
+		is_last_diagonal = ribi_t::is_bend(way_dir);
+		halt_length += is_last_diagonal ? diagonal_tile_length : straight_tile_length;
+		open_dir = way_dir & ~(ribi_t::backward(open_dir));
+		if(  !ribi_t::is_single(open_dir)  ||  !gr->get_neighbour(gr, waytype, open_dir)  ) {
+			break;
+		}
+	}
+	
+	if(  is_last_diagonal  ) {
+		// When the last tile is diagonal, we can use only half of its length as a stop.
+		halt_length += half_diagonal_tile_length - diagonal_tile_length;
+	}
+	return halt_length >> 1;
+}
+
+
+uint32 convoi_t::calc_available_halt_length_in_vehicle_steps(koord3d front_vehicle_pos, ribi_t::ribi front_vehicle_dir) const {
+	return convoi_t::calc_available_halt_length_in_vehicle_steps(front_vehicle_pos, front_vehicle_dir, front()->get_waytype());
+}
+
+
 /**
  * convoi an haltestelle anhalten
  *
  * minimum_loading is now stored in the object (not returned)
  */
-void convoi_t::hat_gehalten(halthandle_t halt)
+void convoi_t::hat_gehalten(halthandle_t halt, uint32 halt_length_in_vehicle_steps)
 {
-	// now find out station length
-	uint16 vehicles_loading = 0;
-	if(fahr[0]->get_desc()->get_waytype() == water_wt) {
-		// harbour and river stop load any size
-		vehicles_loading = anz_vehikel;
-	}
-	else if (anz_vehikel == 1  &&  CARUNITS_PER_TILE >= fahr[0]->get_desc()->get_length()) {
-		vehicles_loading = 1;
-		// one vehicle, which fits into one tile
-	}
-	else {
-		// difference between actual station length and vehicle lenghts
-		sint16 station_length = -fahr[vehicles_loading]->get_desc()->get_length();
-		// iterate through tiles in straight line and look for station
-		koord zv = koord( ribi_t::backward(fahr[0]->get_direction()) );
-		koord3d pos = fahr[0]->get_pos();
-		grund_t *gr=welt->lookup(pos);
-		// start on bridge?
-		pos.z += gr->get_weg_yoff() / TILE_HEIGHT_STEP;
-		do {
-			// advance one station tile
-			station_length += CARUNITS_PER_TILE;
-
-			while(station_length >= 0) {
-				vehicles_loading++;
-				if (vehicles_loading < anz_vehikel) {
-					station_length -= fahr[vehicles_loading]->get_desc()->get_length();
-				}
-				else {
-					// all vehicles fit into station
-					goto station_tile_search_ready;
-				}
-			}
-
-			// search for next station tile
-			pos += zv;
-			gr = welt->lookup(pos);
-			if (gr == NULL) {
-				gr = welt->lookup(pos-koord3d(0,0,1));
-				if (gr == NULL) {
-					gr = welt->lookup(pos-koord3d(0,0,2));
-				}
-				if (gr  &&  (pos.z != gr->get_hoehe() + gr->get_weg_yoff()/TILE_HEIGHT_STEP) ) {
-					// not end/start of bridge
-					break;
-				}
-			}
-
-		}  while(  gr  &&  gr->get_halt() == halt  );
-		// finished
-station_tile_search_ready: ;
+	// Count how many vehicles can load and unload.
+	uint8 vehicles_loading = 0;
+	uint32 convoy_length_step = 0;
+	for(  uint8 idx = 0;  idx < get_vehicle_count();  idx++  ) {
+		// convert 16 steps per a tile to 256 steps per a tile
+		convoy_length_step += get_vehikel(idx)->get_desc()->get_length() << 4;
+		if(  convoy_length_step > halt_length_in_vehicle_steps  ) {
+			break;
+		}
+		vehicles_loading += 1;
 	}
 
 	// next stop in schedule will be a depot
@@ -3547,7 +3589,8 @@ station_tile_search_ready: ;
 	
 	if(  coupling_convoi.is_bound()  ) {
 		// load/unload cargo of coupling convoy.
-		coupling_convoi->hat_gehalten(halt);
+		// pass the remaining halt length subtracting the length of this convoy.
+		coupling_convoi->hat_gehalten(halt, max(0, halt_length_in_vehicle_steps - convoy_length_step));
 	}
 	
 	bool coupling_cond = (self->get_schedule()->get_current_entry().get_coupling_point()==1  &&  !self->is_coupling_done()  &&  !(self->get_coupling_convoi().is_bound()  &&  self->is_coupled()));
@@ -4891,13 +4934,21 @@ void convoi_t::register_journey_time() {
 	}
 }
 
+// Change the owner according to the trading configuration
 void convoi_t::trade_convoi() {
-	if(get_permit_trade()){
-		sint64 value = calc_restwert();
-		owner->book_new_vehicle( value, get_pos().get_2d(), fahr[0] ? fahr[0]->get_desc()->get_waytype() : ignore_wt );
-		set_owner(welt->get_player(get_accept_player_nr()));
-		owner->book_new_vehicle( -value, get_pos().get_2d(), fahr[0] ? fahr[0]->get_desc()->get_waytype() : ignore_wt );
-		set_permit_trade(false);
-		set_accept_player_nr(owner->get_player_nr());
+	if (!get_permit_trade()) {
+		return;
 	}
+	sint64 value = calc_restwert();
+	owner->book_new_vehicle(value, get_pos().get_2d(), fahr[0] ? fahr[0]->get_desc()->get_waytype() : ignore_wt);
+	if(  line.is_bound()  ) {
+		unset_line();
+	} else {
+		unregister_stops();
+	}
+	set_owner(welt->get_player(get_accept_player_nr()));
+	register_stops();
+	owner->book_new_vehicle(-value, get_pos().get_2d(), fahr[0] ? fahr[0]->get_desc()->get_waytype() : ignore_wt);
+	set_permit_trade(false);
+	set_accept_player_nr(owner->get_player_nr());
 }

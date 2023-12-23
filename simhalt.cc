@@ -918,7 +918,8 @@ void haltestelle_t::request_loading( convoihandle_t cnv )
 			convoihandle_t const c = *i;
 			if (c.is_bound() && c->is_loading()) {
 				// now we load into convoi
-				c->hat_gehalten(self);
+				const uint32 halt_length_for_convoy = c->calc_available_halt_length_in_vehicle_steps(c->front()->get_pos(), c->front()->get_direction());
+				c->hat_gehalten(self, halt_length_for_convoy);
 			}
 			if (c.is_bound() && c->is_loading()) {
 				++i;
@@ -3815,6 +3816,10 @@ bool haltestelle_t::is_halt_covered(const halthandle_t &halt) const
 
 
 bool haltestelle_t::book_departure (uint32 arr_tick, uint32 dep_tick, uint32 exp_tick, convoihandle_t cnv) {
+	// check if departure_slot_group_id is properly initialized.
+	if(  cnv->get_line().is_bound()  &&  cnv->get_line()->get_schedule()->get_departure_slot_group_id()==0  ) {
+		dbg->error("haltestelle_t::book_departure", "departure_slot_group_id is zero for %s", cnv->get_name());
+	}
 	const uint8 idx = dep_tick % DST_SIZE;
 	slist_tpl<departure_t>::iterator i = departure_slot_table[idx].begin();
 	const uint8 stop_index = cnv->get_schedule()->get_current_stop_exluding_depot();
@@ -3827,9 +3832,13 @@ bool haltestelle_t::book_departure (uint32 arr_tick, uint32 dep_tick, uint32 exp
 		if(  i->cnv==cnv  &&  i->arr_tick==arr_tick  ) {
 			// The requested slot is already reserved by this convoy.
 			return true;
-		} else if(
+		}
+		const linehandle_t line_a = i->cnv->get_line();
+		const linehandle_t line_b = cnv->get_line();
+		if(
 			i->dep_tick==dep_tick  &&
-			(i->cnv==cnv  ||  i->cnv->get_line()==cnv->get_line())  &&
+			line_a.is_bound()  &&  line_b.is_bound()  &&
+			line_a->get_schedule()->get_departure_slot_group_id()==line_b->get_schedule()->get_departure_slot_group_id()  &&
 			i->stop_index==stop_index
 		) {
 			// The slot is already reserved by other convoy.
