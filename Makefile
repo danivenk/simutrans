@@ -11,6 +11,7 @@ LIBS :=
 SOURCES :=
 STATIC := 0
 
+CFLAGS += -g
 
 CFG ?= default
 -include config.$(CFG)
@@ -456,6 +457,7 @@ SOURCES += gui/pakselector.cc
 SOURCES += gui/pakinstaller.cc
 SOURCES += gui/password_frame.cc
 SOURCES += gui/player_frame_t.cc
+SOURCES += gui/player_merge_frame.cc
 SOURCES += gui/privatesign_info.cc
 SOURCES += gui/savegame_frame.cc
 SOURCES += gui/scenario_frame.cc
@@ -613,6 +615,7 @@ SOURCES += utils/sha1.cc
 SOURCES += utils/sha1_hash.cc
 SOURCES += utils/simrandom.cc
 SOURCES += utils/simstring.cc
+SOURCES += utils/simstring+money.cc
 SOURCES += utils/simthread.cc
 SOURCES += vehicle/movingobj.cc
 SOURCES += vehicle/pedestrian.cc

@@ -713,6 +713,8 @@ public:
 	void get_short_freight_info(cbuffer_t & buf) const;
 
 	void get_transfers_info(cbuffer_t& buf) const;
+	
+	void get_percent_info(cbuffer_t& buf) const;
 
 	/**
 	 * Opens an information window for this station.
@@ -825,6 +827,8 @@ public:
 	 * arr_tick: ticks of arrival
 	 * dep_tick: ticks of requested departure slot
 	 * exp_tick: expiration ticks of the slot
+	 * 
+	 * @returns true when the departure slot was successfully booked. false when denied.
 	 */
 	bool book_departure (uint32 arr_tick, uint32 dep_tick, uint32 exp_tick, convoihandle_t cnv);
 	
